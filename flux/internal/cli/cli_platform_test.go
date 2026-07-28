@@ -32,6 +32,20 @@ func TestRunGenerateCommand(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(out, "openapi.json")); err != nil {
 		t.Fatalf("expected openapi.json: %v", err)
 	}
+	expected := []string{
+		filepath.Join(out, "agent.json"),
+		filepath.Join(out, "mcp.json"),
+		filepath.Join(out, "tool_manifest.json"),
+		filepath.Join(out, "prompts.md"),
+		filepath.Join(out, "openapi.yaml"),
+		filepath.Join(out, "examples", "inventory-summary.json"),
+		filepath.Join(out, "schemas", "inventory-summary.schema.json"),
+	}
+	for _, p := range expected {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("expected generated AI artifact %s: %v", p, err)
+		}
+	}
 }
 
 func TestRunHealthCommandWritesHealthReport(t *testing.T) {
