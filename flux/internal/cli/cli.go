@@ -338,6 +338,7 @@ func scanRepository(args []string) int {
 	fmt.Printf("Workspace: %s\n", artifacts.WorkspacePath)
 	fmt.Printf("Inventory: %s\n", artifacts.InventoryPath)
 	fmt.Printf("Harness:   %s\n", artifacts.HarnessPath)
+	fmt.Printf("Suites:    %s\n", artifacts.TestSuitesPath)
 	fmt.Printf("Drift:     %s\n", artifacts.DriftPath)
 	return 0
 }

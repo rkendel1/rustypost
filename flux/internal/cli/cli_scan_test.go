@@ -24,8 +24,12 @@ func setup(r any) { r.Get("/status", nil) }`
 		filepath.Join(out, "openapi.json"),
 		filepath.Join(out, "workspace.json"),
 		filepath.Join(out, "inventory.json"),
+		filepath.Join(out, "testsuites.json"),
 		filepath.Join(out, "drift.json"),
 		filepath.Join(out, "tests", "scan-harness.js"),
+		filepath.Join(out, "tests", "scan.playwright.spec.js"),
+		filepath.Join(out, "tests", "scan.jest.spec.js"),
+		filepath.Join(out, "tests", "scan.runner.js"),
 	}
 	for _, p := range expected {
 		if _, err := os.Stat(p); err != nil {

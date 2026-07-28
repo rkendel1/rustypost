@@ -12,6 +12,7 @@ func TestScanRepositoryDiscoversEndpointsAndAuth(t *testing.T) {
 	src := `package api
 func register(router any) {
   // Authorization: ******
+  // required: ["email", "password"]
   router.Get("/users/{id}", nil)
   router.Post("/users", nil)
 }`
@@ -28,6 +29,18 @@ func register(router any) {
 	}
 	if len(inv.AuthSchemes) == 0 || inv.AuthSchemes[0] != "bearer" {
 		t.Fatalf("expected bearer auth scheme, got %+v", inv.AuthSchemes)
+	}
+	var foundPost bool
+	for _, ep := range inv.Endpoints {
+		if ep.Method == "POST" && ep.Path == "/users" {
+			foundPost = true
+			if ep.RequestSchema == nil {
+				t.Fatalf("expected inferred request schema for POST endpoint")
+			}
+		}
+	}
+	if !foundPost {
+		t.Fatalf("expected POST /users endpoint")
 	}
 }
 
@@ -68,5 +81,18 @@ func TestGenerateArtifactsCreatesScanOutputs(t *testing.T) {
 	}
 	if _, err := os.Stat(artifacts.HarnessPath); err != nil {
 		t.Fatalf("missing harness file: %v", err)
+	}
+	if _, err := os.Stat(artifacts.TestSuitesPath); err != nil {
+		t.Fatalf("missing test suites file: %v", err)
+	}
+	expectedGeneratedTests := []string{
+		filepath.Join(out, "tests", "scan.playwright.spec.js"),
+		filepath.Join(out, "tests", "scan.jest.spec.js"),
+		filepath.Join(out, "tests", "scan.runner.js"),
+	}
+	for _, p := range expectedGeneratedTests {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("missing generated test file %s: %v", p, err)
+		}
 	}
 }

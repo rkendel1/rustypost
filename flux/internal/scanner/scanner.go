@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"flux/internal/external"
 	"flux/internal/models"
 	"flux/internal/schema"
 )
@@ -42,12 +44,13 @@ type Inventory struct {
 }
 
 type Artifacts struct {
-	OutputDir     string `json:"outputDir"`
-	OpenAPIPath   string `json:"openapiPath"`
-	WorkspacePath string `json:"workspacePath"`
-	InventoryPath string `json:"inventoryPath"`
-	HarnessPath   string `json:"harnessPath"`
-	DriftPath     string `json:"driftPath"`
+	OutputDir      string `json:"outputDir"`
+	OpenAPIPath    string `json:"openapiPath"`
+	WorkspacePath  string `json:"workspacePath"`
+	InventoryPath  string `json:"inventoryPath"`
+	HarnessPath    string `json:"harnessPath"`
+	TestSuitesPath string `json:"testSuitesPath"`
+	DriftPath      string `json:"driftPath"`
 }
 
 type routePattern struct {
@@ -63,6 +66,19 @@ var routePatterns = []routePattern{
 	{re: regexp.MustCompile(`(?im)@route\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(/[\S]*)`), methodIdx: 1, pathIdx: 2},
 	{re: regexp.MustCompile("(?i)\\bHandleFunc\\s*\\(\\s*[\"'`](/[^\"'`]*)[\"'`]"), pathIdx: 1, defaultMethod: "GET"},
 }
+
+var (
+	responseJSONRegex      = regexp.MustCompile(`(?s)res\.json\s*\(\s*(\{.*?\})\s*\)`)
+	goResponseJSONRegex    = regexp.MustCompile(`(?s)JSON\s*\(\s*\d+\s*,\s*(\{.*?\})\s*\)`)
+	jsonKeyRegex           = regexp.MustCompile(`["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*:`)
+	pathParamRegex         = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+	colonPathParamRegex    = regexp.MustCompile(`:([A-Za-z_][A-Za-z0-9_]*)`)
+	requestBodyFieldRegex  = regexp.MustCompile(`(?i)\b(?:req|request|ctx)\.body\.([A-Za-z_][A-Za-z0-9_]*)`)
+	requestBodyIndexRegex  = regexp.MustCompile(`(?i)\b(?:req|request|ctx)\.body\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]`)
+	requiredFieldsRegex    = regexp.MustCompile(`(?is)required\s*:\s*\[(.*?)\]`)
+	requiredFieldNameRegex = regexp.MustCompile(`['"]([A-Za-z_][A-Za-z0-9_]*)['"]`)
+	statusCodeRegex        = regexp.MustCompile(`(?i)\b(?:status|Status|WriteHeader)\s*\(?\s*([1-5][0-9][0-9])`)
+)
 
 func ScanRepository(root string) (*Inventory, error) {
 	absRoot, err := filepath.Abs(root)
@@ -140,7 +156,7 @@ func ScanRepository(root string) (*Inventory, error) {
 						lines:  map[int]struct{}{},
 						auth:   map[string]struct{}{},
 						params: map[string]Parameter{},
-						req:    inferRequestSchema(method),
+						req:    nil,
 						resp:   map[string]map[string]any{},
 					}
 					for _, p := range extractPathParams(normalizedPath) {
@@ -155,12 +171,15 @@ func ScanRepository(root string) (*Inventory, error) {
 				entry.lines[line] = struct{}{}
 
 				snippet := extractSnippet(content, idx[0], idx[1], 800)
+				entry.req = mergeSchema(entry.req, inferRequestSchema(method, snippet))
 				for _, a := range inferAuthSchemes(snippet) {
 					entry.auth[a] = struct{}{}
 					globalAuth[a] = struct{}{}
 				}
-				if len(entry.resp) == 0 {
-					entry.resp["200"] = inferResponseSchema(snippet)
+				for code, schemaRef := range inferResponseSchemas(snippet) {
+					if _, exists := entry.resp[code]; !exists {
+						entry.resp[code] = schemaRef
+					}
 				}
 			}
 		}
@@ -215,22 +234,30 @@ func GenerateArtifacts(root, outDir string, inv *Inventory) (*Artifacts, error) 
 	workspacePath := filepath.Join(outDir, "workspace.json")
 	inventoryPath := filepath.Join(outDir, "inventory.json")
 	harnessPath := filepath.Join(outDir, "tests", "scan-harness.js")
+	testSuitesPath := filepath.Join(outDir, "testsuites.json")
 	driftPath := filepath.Join(outDir, "drift.json")
 
-	var oldSpecPath string
+	oldSpecPath := ""
+	oldSpecCopyExists := false
 	if b, err := os.ReadFile(openapiPath); err == nil {
 		oldSpecPath = filepath.Join(outDir, ".openapi.previous.json")
 		if writeErr := os.WriteFile(oldSpecPath, b, 0o644); writeErr == nil {
-			defer os.Remove(oldSpecPath)
+			oldSpecCopyExists = true
 		} else {
 			oldSpecPath = ""
 		}
 	}
+	if oldSpecCopyExists {
+		defer os.Remove(oldSpecPath)
+	}
+
+	collection := buildCollection(inv)
+	workspace := buildWorkspace(collection)
 
 	if err := writeJSON(openapiPath, buildOpenAPI(inv)); err != nil {
 		return nil, err
 	}
-	if err := writeJSON(workspacePath, buildWorkspace(inv)); err != nil {
+	if err := writeJSON(workspacePath, workspace); err != nil {
 		return nil, err
 	}
 	if err := writeJSON(inventoryPath, inv); err != nil {
@@ -239,17 +266,24 @@ func GenerateArtifacts(root, outDir string, inv *Inventory) (*Artifacts, error) 
 	if err := os.WriteFile(harnessPath, []byte(buildHarness(inv)), 0o755); err != nil {
 		return nil, err
 	}
+	if err := writeJSON(testSuitesPath, buildTestSuites(collection)); err != nil {
+		return nil, err
+	}
+	if err := writeGeneratedSuiteFiles(filepath.Join(outDir, "tests"), collection); err != nil {
+		return nil, err
+	}
 	if err := writeJSON(driftPath, buildDrift(oldSpecPath, openapiPath)); err != nil {
 		return nil, err
 	}
 
 	return &Artifacts{
-		OutputDir:     outDir,
-		OpenAPIPath:   openapiPath,
-		WorkspacePath: workspacePath,
-		InventoryPath: inventoryPath,
-		HarnessPath:   harnessPath,
-		DriftPath:     driftPath,
+		OutputDir:      outDir,
+		OpenAPIPath:    openapiPath,
+		WorkspacePath:  workspacePath,
+		InventoryPath:  inventoryPath,
+		HarnessPath:    harnessPath,
+		TestSuitesPath: testSuitesPath,
+		DriftPath:      driftPath,
 	}, nil
 }
 
@@ -325,7 +359,7 @@ func buildOpenAPI(inv *Inventory) map[string]any {
 						"type": "oauth2",
 						"flows": map[string]any{
 							"clientCredentials": map[string]any{
-								"tokenUrl": "https://example.com/oauth/token",
+								"tokenUrl": "{{OAUTH_TOKEN_URL}}",
 								"scopes":   map[string]string{},
 							},
 						},
@@ -354,7 +388,7 @@ func buildOpenAPI(inv *Inventory) map[string]any {
 	}
 }
 
-func buildWorkspace(inv *Inventory) map[string]any {
+func buildCollection(inv *Inventory) models.Collection {
 	requests := make([]models.SavedRequest, 0, len(inv.Endpoints))
 	collID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -386,17 +420,18 @@ func buildWorkspace(inv *Inventory) map[string]any {
 			CreatedAt: now,
 		})
 	}
+	return models.Collection{
+		ID:       collID,
+		Name:     "Discovered API",
+		Requests: requests,
+	}
+}
 
+func buildWorkspace(collection models.Collection) map[string]any {
 	return map[string]any{
 		"version":     "1",
 		"generatedAt": time.Now().UTC().Format(time.RFC3339),
-		"collections": []models.Collection{
-			{
-				ID:       collID,
-				Name:     "Discovered API",
-				Requests: requests,
-			},
-		},
+		"collections": []models.Collection{collection},
 		"environments": []models.Environment{
 			{
 				ID:   uuid.NewString(),
@@ -405,10 +440,63 @@ func buildWorkspace(inv *Inventory) map[string]any {
 					{Key: "BASE_URL", Value: "http://localhost:3000", Enabled: true},
 					{Key: "TOKEN", Value: "", Enabled: true},
 					{Key: "API_KEY", Value: "", Enabled: true},
+					{Key: "OAUTH_TOKEN_URL", Value: "", Enabled: true},
 				},
 			},
 		},
 	}
+}
+
+func buildTestSuites(collection models.Collection) []models.TestSuite {
+	groups := make([]models.TestGroup, 0, len(collection.Requests))
+	for _, req := range collection.Requests {
+		groups = append(groups, models.TestGroup{
+			ID:        uuid.NewString(),
+			Name:      req.Name,
+			RequestID: req.ID,
+			Assertions: []models.Assertion{
+				{Type: models.AssertStatusCode, Target: "200"},
+			},
+		})
+	}
+	return []models.TestSuite{
+		{
+			ID:          uuid.NewString(),
+			Name:        "Discovered API Suite",
+			Description: "Generated by reqit scan",
+			CollID:      collection.ID,
+			Groups:      groups,
+		},
+	}
+}
+
+func writeGeneratedSuiteFiles(dir string, collection models.Collection) error {
+	assertions := make(map[string][]models.Assertion, len(collection.Requests))
+	for _, req := range collection.Requests {
+		assertions[req.ID] = []models.Assertion{{Type: models.AssertStatusCode, Target: "200"}}
+	}
+	playwright, err := external.GeneratePlaywrightTest(collection, collection.Requests, assertions, false)
+	if err != nil {
+		return err
+	}
+	if _, err := external.SaveTestFile(playwright, dir, "scan.playwright.spec.js"); err != nil {
+		return err
+	}
+	jest, err := external.GenerateJestTest(collection, collection.Requests, assertions, false)
+	if err != nil {
+		return err
+	}
+	if _, err := external.SaveTestFile(jest, dir, "scan.jest.spec.js"); err != nil {
+		return err
+	}
+	runner, err := external.GenerateCLIRunner(collection, collection.Requests)
+	if err != nil {
+		return err
+	}
+	if _, err := external.SaveTestFile(runner, dir, "scan.runner.js"); err != nil {
+		return err
+	}
+	return nil
 }
 
 func buildHarness(inv *Inventory) string {
@@ -501,9 +589,40 @@ func inferAuthSchemes(s string) []string {
 	return setToSortedStrings(out)
 }
 
-func inferRequestSchema(method string) map[string]any {
+func inferRequestSchema(method, snippet string) map[string]any {
 	if method == "GET" || method == "HEAD" || method == "OPTIONS" {
 		return nil
+	}
+	keys := map[string]struct{}{}
+	for _, m := range requestBodyFieldRegex.FindAllStringSubmatch(snippet, -1) {
+		if len(m) > 1 {
+			keys[m[1]] = struct{}{}
+		}
+	}
+	for _, m := range requestBodyIndexRegex.FindAllStringSubmatch(snippet, -1) {
+		if len(m) > 1 {
+			keys[m[1]] = struct{}{}
+		}
+	}
+	if rm := requiredFieldsRegex.FindStringSubmatch(snippet); len(rm) > 1 {
+		for _, fm := range requiredFieldNameRegex.FindAllStringSubmatch(rm[1], -1) {
+			if len(fm) > 1 {
+				keys[fm[1]] = struct{}{}
+			}
+		}
+	}
+	if len(keys) > 0 {
+		props := map[string]any{}
+		required := make([]string, 0, len(keys))
+		for _, k := range setToSortedStrings(keys) {
+			props[k] = map[string]any{"type": "string"}
+			required = append(required, k)
+		}
+		return map[string]any{
+			"type":       "object",
+			"properties": props,
+			"required":   required,
+		}
 	}
 	return map[string]any{
 		"type":                 "object",
@@ -532,18 +651,38 @@ func inferResponseSchema(snippet string) map[string]any {
 	}
 }
 
+func inferResponseSchemas(snippet string) map[string]map[string]any {
+	schemaRef := inferResponseSchema(snippet)
+	matches := statusCodeRegex.FindAllStringSubmatch(snippet, -1)
+	if len(matches) == 0 {
+		return map[string]map[string]any{"200": schemaRef}
+	}
+	out := map[string]map[string]any{}
+	for _, m := range matches {
+		if len(m) < 2 {
+			continue
+		}
+		if _, err := strconv.Atoi(m[1]); err == nil {
+			out[m[1]] = schemaRef
+		}
+	}
+	if len(out) == 0 {
+		out["200"] = schemaRef
+	}
+	return out
+}
+
 func inferJSONKeys(snippet string) []string {
 	obj := ""
-	if m := regexp.MustCompile(`(?s)res\.json\s*\(\s*(\{.*?\})\s*\)`).FindStringSubmatch(snippet); len(m) > 1 {
+	if m := responseJSONRegex.FindStringSubmatch(snippet); len(m) > 1 {
 		obj = m[1]
-	} else if m := regexp.MustCompile(`(?s)JSON\s*\(\s*\d+\s*,\s*(\{.*?\})\s*\)`).FindStringSubmatch(snippet); len(m) > 1 {
+	} else if m := goResponseJSONRegex.FindStringSubmatch(snippet); len(m) > 1 {
 		obj = m[1]
 	}
 	if obj == "" {
 		return nil
 	}
-	keyRx := regexp.MustCompile(`["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*:`)
-	matches := keyRx.FindAllStringSubmatch(obj, -1)
+	matches := jsonKeyRegex.FindAllStringSubmatch(obj, -1)
 	set := map[string]struct{}{}
 	for _, m := range matches {
 		if len(m) < 2 {
@@ -555,8 +694,7 @@ func inferJSONKeys(snippet string) []string {
 }
 
 func extractPathParams(path string) []Parameter {
-	rx := regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
-	matches := rx.FindAllStringSubmatch(path, -1)
+	matches := pathParamRegex.FindAllStringSubmatch(path, -1)
 	var out []Parameter
 	for _, m := range matches {
 		out = append(out, Parameter{Name: m[1], In: "path", Required: true})
@@ -593,7 +731,7 @@ func normalizePath(p string) string {
 	if !strings.HasPrefix(p, "/") {
 		p = "/" + p
 	}
-	p = regexp.MustCompile(`:([A-Za-z_][A-Za-z0-9_]*)`).ReplaceAllString(p, `{$1}`)
+	p = colonPathParamRegex.ReplaceAllString(p, `{$1}`)
 	pathOnly := strings.SplitN(p, " ", 2)[0]
 	return pathOnly
 }
@@ -627,6 +765,42 @@ func isScannableFile(path string) bool {
 	default:
 		return false
 	}
+}
+
+func mergeSchema(current, inferred map[string]any) map[string]any {
+	if len(inferred) == 0 {
+		return current
+	}
+	if len(current) == 0 {
+		return inferred
+	}
+	if current["properties"] == nil {
+		return current
+	}
+	curProps, ok := current["properties"].(map[string]any)
+	if !ok {
+		return current
+	}
+	infProps, ok := inferred["properties"].(map[string]any)
+	if !ok {
+		return current
+	}
+	for k, v := range infProps {
+		curProps[k] = v
+	}
+	requiredSet := map[string]struct{}{}
+	for _, src := range []map[string]any{current, inferred} {
+		if req, ok := src["required"].([]string); ok {
+			for _, r := range req {
+				requiredSet[r] = struct{}{}
+			}
+		}
+	}
+	if len(requiredSet) > 0 {
+		current["required"] = setToSortedStrings(requiredSet)
+	}
+	current["properties"] = curProps
+	return current
 }
 
 func writeJSON(path string, v any) error {
