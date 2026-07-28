@@ -20,6 +20,7 @@ import (
 	"flux/internal/mock"
 	"flux/internal/scanner"
 	"flux/internal/watcher"
+	"gopkg.in/yaml.v3"
 )
 
 type scanConfig struct {
@@ -658,6 +659,7 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
+    # Daily at 02:00 UTC
     - cron: "0 2 * * *"
 jobs:
   run:
@@ -672,7 +674,7 @@ jobs:
 func writeSDKFiles(dir string, inv *scanner.Inventory) error {
 	manifest := map[string]any{
 		"generatedAt": time.Now().UTC().Format(time.RFC3339),
-		"languages":   []string{"typescript", "javascript", "python", "rust", "go", "java", "kotlin", "swift", "csharp"},
+		"languages":   []string{"typescript", "javascript", "python", "rust", "go", "java", "kotlin", "swift", "c#"},
 		"endpoints":   len(inv.Endpoints),
 	}
 	manifestBytes, _ := json.MarshalIndent(manifest, "", "  ")
@@ -754,8 +756,13 @@ func writeAIReadinessFiles(outDir string, inv *scanner.Inventory) error {
 	}
 	openapiJSON := filepath.Join(outDir, "openapi.json")
 	if b, err := os.ReadFile(openapiJSON); err == nil {
-		if err := os.WriteFile(filepath.Join(outDir, "openapi.yaml"), b, 0o644); err != nil {
-			return err
+		var spec map[string]any
+		if err := json.Unmarshal(b, &spec); err == nil {
+			if y, err := yaml.Marshal(spec); err == nil {
+				if err := os.WriteFile(filepath.Join(outDir, "openapi.yaml"), y, 0o644); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
