@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"flux/internal/environments"
 	"flux/internal/models"
 	"flux/internal/requester"
+	"flux/internal/scanner"
 	"flux/internal/workspaces"
 )
 
@@ -41,6 +43,8 @@ func Run(args []string) int {
 	switch args[0] {
 	case "run":
 		return runCollection(args[1:])
+	case "scan":
+		return scanRepository(args[1:])
 	case "list":
 		return listResources(args[1:])
 	case "help", "--help", "-h":
@@ -58,6 +62,7 @@ func printUsage() {
 
 Usage:
   reqit run <collection> [--env <name>] [--output <format>]
+  reqit scan <repository-path> [--output <dir>]
   reqit list collections
   reqit list environments
   reqit help
@@ -65,6 +70,7 @@ Usage:
 Flags:
   --env       Environment name (default: active environment)
   --output    Output format: text (default) or json
+             (for scan: output directory, default <repository-path>/.reqit/scan)
   --workspace Workspace ID (default: active workspace)
 `)
 }
@@ -275,6 +281,64 @@ func runCollection(args []string) int {
 	if failed > 0 {
 		return 1
 	}
+	return 0
+}
+
+func scanRepository(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: reqit scan <repository-path> [--output <dir>]")
+		return 1
+	}
+	targetPath := ""
+	outputDir := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--output", "-o":
+			if i+1 < len(args) {
+				i++
+				outputDir = args[i]
+			}
+		case "--help", "-h":
+			fmt.Fprintln(os.Stderr, "Usage: reqit scan <repository-path> [--output <dir>]")
+			return 0
+		default:
+			if targetPath == "" {
+				targetPath = args[i]
+			}
+		}
+	}
+	if targetPath == "" {
+		fmt.Fprintln(os.Stderr, "Error: repository path is required")
+		return 1
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error resolving path: %v\n", err)
+		return 1
+	}
+	if outputDir == "" {
+		outputDir = filepath.Join(absTarget, ".reqit", "scan")
+	} else if !filepath.IsAbs(outputDir) {
+		outputDir = filepath.Join(absTarget, outputDir)
+	}
+
+	inventory, err := scanner.ScanRepository(absTarget)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Scan failed: %v\n", err)
+		return 1
+	}
+	artifacts, err := scanner.GenerateArtifacts(absTarget, outputDir, inventory)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Artifact generation failed: %v\n", err)
+		return 1
+	}
+
+	fmt.Printf("Scanned %d file(s), discovered %d endpoint(s).\n", inventory.FilesScanned, len(inventory.Endpoints))
+	fmt.Printf("OpenAPI:   %s\n", artifacts.OpenAPIPath)
+	fmt.Printf("Workspace: %s\n", artifacts.WorkspacePath)
+	fmt.Printf("Inventory: %s\n", artifacts.InventoryPath)
+	fmt.Printf("Harness:   %s\n", artifacts.HarnessPath)
+	fmt.Printf("Drift:     %s\n", artifacts.DriftPath)
 	return 0
 }
 
