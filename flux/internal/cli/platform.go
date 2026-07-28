@@ -41,6 +41,11 @@ type healthReport struct {
 	Categories  []healthCategory `json:"categories"`
 }
 
+const (
+	defaultGitTimeout = 45 * time.Second
+	gitNetworkTimeout = 10 * time.Minute
+)
+
 func loginCommand(args []string) int {
 	if len(args) < 1 || args[0] != "github" {
 		fmt.Fprintln(os.Stderr, "Usage: reqit login github [--token <token>]")
@@ -632,10 +637,19 @@ func writeWorkflowFiles(repoRoot string, artifacts *scanner.Artifacts) ([]string
 	if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 		return nil, err
 	}
+	smokeCommand := "echo \"scan harness missing; run reqit generate .\" && exit 1"
+	if _, err := os.Stat(artifacts.HarnessPath); err == nil {
+		smokeCommand = "node " + filepath.ToSlash(artifacts.HarnessPath)
+	}
+	runnerPath := filepath.Join(filepath.Dir(artifacts.HarnessPath), "scan.runner.js")
+	regressionCommand := "echo \"scan runner missing; run reqit generate .\" && exit 1"
+	if _, err := os.Stat(runnerPath); err == nil {
+		regressionCommand = "node " + filepath.ToSlash(runnerPath)
+	}
 	files := map[string]string{
-		"api-smoke.yml":      workflowYAML("api-smoke", "node "+filepath.ToSlash(artifacts.HarnessPath)),
+		"api-smoke.yml":      workflowYAML("api-smoke", smokeCommand),
 		"api-contract.yml":   workflowYAML("api-contract", "test -f "+filepath.ToSlash(artifacts.OpenAPIPath)),
-		"api-regression.yml": workflowYAML("api-regression", "node "+filepath.ToSlash(filepath.Join(filepath.Dir(artifacts.HarnessPath), "scan.runner.js"))),
+		"api-regression.yml": workflowYAML("api-regression", regressionCommand),
 		"api-security.yml":   workflowYAML("api-security", "grep -R \"authorization\\|apiKey\\|oauth\" "+filepath.ToSlash(artifacts.OpenAPIPath)+" || true"),
 		"schema-drift.yml":   workflowYAML("schema-drift", "cat "+filepath.ToSlash(artifacts.DriftPath)),
 		"sdk-generation.yml": workflowYAML("sdk-generation", "echo \"run reqit sdk generate .\""),
@@ -659,7 +673,7 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
-    # Daily at 02:00 UTC (GitHub Actions cron schedules run in UTC)
+    # Daily at 02:00 UTC
     - cron: "0 2 * * *"
 jobs:
   run:
@@ -828,11 +842,11 @@ func loadGitHubToken() (string, error) {
 }
 
 func gitExec(dir string, args ...string) (string, error) {
-	timeout := 45 * time.Second
+	timeout := defaultGitTimeout
 	if len(args) > 0 {
 		switch args[0] {
 		case "clone", "pull", "push", "fetch":
-			timeout = 10 * time.Minute
+			timeout = gitNetworkTimeout
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
