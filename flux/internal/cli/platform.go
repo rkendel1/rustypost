@@ -659,7 +659,7 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
-    # Daily at 02:00 UTC
+    # Daily at 02:00 UTC (GitHub Actions cron schedules run in UTC)
     - cron: "0 2 * * *"
 jobs:
   run:
@@ -674,7 +674,7 @@ jobs:
 func writeSDKFiles(dir string, inv *scanner.Inventory) error {
 	manifest := map[string]any{
 		"generatedAt": time.Now().UTC().Format(time.RFC3339),
-		"languages":   []string{"typescript", "javascript", "python", "rust", "go", "java", "kotlin", "swift", "csharp"},
+		"languages":   []string{"typescript", "python", "go", "rust"},
 		"endpoints":   len(inv.Endpoints),
 	}
 	manifestBytes, _ := json.MarshalIndent(manifest, "", "  ")
@@ -828,7 +828,14 @@ func loadGitHubToken() (string, error) {
 }
 
 func gitExec(dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	timeout := 45 * time.Second
+	if len(args) > 0 {
+		switch args[0] {
+		case "clone", "pull", "push", "fetch":
+			timeout = 10 * time.Minute
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
