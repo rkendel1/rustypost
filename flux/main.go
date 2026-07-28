@@ -18,7 +18,7 @@ func main() {
 	// If the first arg is a CLI command, run headlessly.
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "run", "list", "help", "--help", "-h":
+		case "run", "scan", "list", "help", "--help", "-h":
 			os.Exit(cli.Run(os.Args[1:]))
 		case "mcp":
 			os.Exit(cli.RunMCP(os.Args[2:]))
@@ -28,9 +28,9 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:  "reqit",
-		Width:  1280,
-		Height: 800,
+		Title:     "reqit",
+		Width:     1280,
+		Height:    800,
 		MinWidth:  1024,
 		MinHeight: 640,
 		AssetServer: &assetserver.Options{
