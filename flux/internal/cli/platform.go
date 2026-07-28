@@ -674,7 +674,7 @@ jobs:
 func writeSDKFiles(dir string, inv *scanner.Inventory) error {
 	manifest := map[string]any{
 		"generatedAt": time.Now().UTC().Format(time.RFC3339),
-		"languages":   []string{"typescript", "javascript", "python", "rust", "go", "java", "kotlin", "swift", "c#"},
+		"languages":   []string{"typescript", "javascript", "python", "rust", "go", "java", "kotlin", "swift", "csharp"},
 		"endpoints":   len(inv.Endpoints),
 	}
 	manifestBytes, _ := json.MarshalIndent(manifest, "", "  ")
