@@ -414,10 +414,10 @@ func buildWorkspace(inv *Inventory) map[string]any {
 func buildHarness(inv *Inventory) string {
 	payload, _ := json.Marshal(inv.Endpoints)
 	return `#!/usr/bin/env node
-const baseUrl = process.env.REQIT_SCAN_BASE_URL || process.env.BASE_URL;
+const baseURL = process.env.REQIT_SCAN_BASE_URL || process.env.BASE_URL;
 const endpoints = ` + string(payload) + `;
 
-if (!baseUrl) {
+if (!baseURL) {
   console.error("REQIT_SCAN_BASE_URL (or BASE_URL) is required.");
   process.exit(1);
 }
@@ -425,7 +425,7 @@ if (!baseUrl) {
 async function run() {
   let failed = 0;
   for (const ep of endpoints) {
-    const url = new URL(ep.path, baseUrl).toString();
+    const url = new URL(ep.path, baseURL).toString();
     const method = ep.method || "GET";
     const body = (method === "GET" || method === "HEAD" || method === "OPTIONS") ? undefined : "{}";
     try {
