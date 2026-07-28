@@ -41,10 +41,38 @@ func Run(args []string) int {
 	}
 
 	switch args[0] {
+	case "login":
+		return loginCommand(args[1:])
+	case "repos":
+		return listReposCommand(args[1:])
+	case "clone":
+		return cloneRepoCommand(args[1:])
 	case "run":
 		return runCollection(args[1:])
 	case "scan":
 		return scanRepository(args[1:])
+	case "watch":
+		return watchRepository(args[1:])
+	case "generate":
+		return generateCommand(args[1:])
+	case "push":
+		return pushCommand(args[1:])
+	case "create-pr":
+		return createPRCommand(args[1:])
+	case "sync":
+		return syncCommand(args[1:])
+	case "health":
+		return healthCommand(args[1:])
+	case "drift":
+		return driftCommand(args[1:])
+	case "workflow":
+		return workflowCommand(args[1:])
+	case "sdk":
+		return sdkCommand(args[1:])
+	case "mock":
+		return mockCommand(args[1:])
+	case "report":
+		return reportCommand(args[1:])
 	case "list":
 		return listResources(args[1:])
 	case "help", "--help", "-h":
@@ -61,8 +89,22 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `reqit — API client
 
 Usage:
+  reqit login github [--token <token>]
+  reqit repos
+  reqit clone <owner/repository> [--dir <directory>]
   reqit run <collection> [--env <name>] [--output <format>]
   reqit scan <repository-path> [--output <dir>]
+  reqit watch <repository-path> [--output <dir>]
+  reqit generate <repository-path> [--output <dir>]
+  reqit push [--repo <path>]
+  reqit create-pr --title <title> [--body <body>] [--base <branch>] [--repo <path>]
+  reqit sync [--repo <path>] [--output <dir>]
+  reqit health <repository-path> [--output <dir>]
+  reqit drift <repository-path> [--output <dir>]
+  reqit workflow install <repository-path> [--output <dir>]
+  reqit sdk generate <repository-path> [--output <dir>]
+  reqit mock start <repository-path> [--port <port>]
+  reqit report <repository-path> [--output <dir>]
   reqit list collections
   reqit list environments
   reqit help
