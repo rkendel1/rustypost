@@ -61,11 +61,18 @@ type routePattern struct {
 }
 
 var routePatterns = []routePattern{
-	{re: regexp.MustCompile("(?i)\\b(?:app|router|r|e|mux)\\.(get|post|put|patch|delete|options|head)\\s*\\(\\s*[\"'`](/[^\"'`]*)[\"'`]"), methodIdx: 1, pathIdx: 2},
-	{re: regexp.MustCompile("(?i)\\b(?:Method|Handle)\\s*\\(\\s*[\"'`](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)[\"'`]\\s*,\\s*[\"'`](/[^\"'`]*)[\"'`]"), methodIdx: 1, pathIdx: 2},
-	{re: regexp.MustCompile(`(?im)@route\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(/[\S]*)`), methodIdx: 1, pathIdx: 2},
-	{re: regexp.MustCompile("(?i)\\bHandleFunc\\s*\\(\\s*[\"'`](/[^\"'`]*)[\"'`]"), pathIdx: 1, defaultMethod: "GET"},
+	{re: regexp.MustCompile(jsRouterPattern), methodIdx: 1, pathIdx: 2},
+	{re: regexp.MustCompile(explicitMethodPattern), methodIdx: 1, pathIdx: 2},
+	{re: regexp.MustCompile(routeAnnotationPattern), methodIdx: 1, pathIdx: 2},
+	{re: regexp.MustCompile(handleFuncPattern), pathIdx: 1, defaultMethod: "GET"},
 }
+
+const (
+	jsRouterPattern        = "(?i)\\b(?:app|router|r|e|mux)\\.(get|post|put|patch|delete|options|head)\\s*\\(\\s*[\"'`](/[^\"'`]*)[\"'`]"
+	explicitMethodPattern  = "(?i)\\b(?:Method|Handle)\\s*\\(\\s*[\"'`](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)[\"'`]\\s*,\\s*[\"'`](/[^\"'`]*)[\"'`]"
+	routeAnnotationPattern = `(?im)@route\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(/[\S]*)`
+	handleFuncPattern      = "(?i)\\bHandleFunc\\s*\\(\\s*[\"'`](/[^\"'`]*)[\"'`]"
+)
 
 var (
 	responseJSONRegex      = regexp.MustCompile(`(?s)res\.json\s*\(\s*(\{.*?\})\s*\)`)
@@ -320,7 +327,7 @@ func buildOpenAPI(inv *Inventory) map[string]any {
 			}
 			op["parameters"] = params
 		}
-		if len(ep.RequestSchema) > 0 && ep.Method != "GET" && ep.Method != "HEAD" && ep.Method != "OPTIONS" {
+		if len(ep.RequestSchema) > 0 && !isMethodWithoutBody(ep.Method) {
 			op["requestBody"] = map[string]any{
 				"required": false,
 				"content": map[string]any{
@@ -399,7 +406,7 @@ func buildCollection(inv *Inventory) models.Collection {
 			URL:      "{{BASE_URL}}" + ep.Path,
 			BodyType: "none",
 		}
-		if ep.Method != "GET" && ep.Method != "HEAD" && ep.Method != "OPTIONS" {
+		if !isMethodWithoutBody(ep.Method) {
 			payload.BodyType = "json"
 			payload.Body = "{}"
 		}
@@ -589,8 +596,17 @@ func inferAuthSchemes(s string) []string {
 	return setToSortedStrings(out)
 }
 
+func isMethodWithoutBody(method string) bool {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case "GET", "HEAD", "OPTIONS":
+		return true
+	default:
+		return false
+	}
+}
+
 func inferRequestSchema(method, snippet string) map[string]any {
-	if method == "GET" || method == "HEAD" || method == "OPTIONS" {
+	if isMethodWithoutBody(method) {
 		return nil
 	}
 	keys := map[string]struct{}{}
