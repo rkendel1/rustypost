@@ -260,6 +260,16 @@ export function GetVersion():Promise<string>;
 
 export function GetWorkspaces():Promise<Array<workspaces.Info>>;
 
+export function GitHubCloneRepository(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function GitHubDeletePAT(arg1:string):Promise<void>;
+
+export function GitHubGetViewer(arg1:string):Promise<string>;
+
+export function GitHubListRepositories(arg1:string,arg2:string):Promise<string>;
+
+export function GitHubSavePAT(arg1:string,arg2:string):Promise<void>;
+
 export function GitMergeBranch(arg1:string):Promise<void>;
 
 export function GitPopStash():Promise<void>;
@@ -393,6 +403,8 @@ export function RunCollectionWithConfig(arg1:models.RunnerConfig):Promise<models
 export function RunEvalAgentLens():Promise<agentlens.EvalSuiteResult>;
 
 export function RunLoadTest(arg1:models.LoadTestConfig):Promise<models.LoadTestResult>;
+
+export function RunRepoAutomation(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SaveAISettings(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 

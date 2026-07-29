@@ -5,11 +5,26 @@ import {
   GetTelemetryConfig, SetTelemetryEnabled, GetTelemetryPreview, GetTelemetryEvents,
   PushToSwaggerHub, PullFromSwaggerHub, PushToStoplight, PullFromStoplight,
   GenerateJenkins, GenerateGitHubAction, GenerateGitLabCI, GenerateCLIRunnerScript,
-  SaveGeneratedTest, SendNotification,
+  SaveGeneratedTest,
+  GitHubSavePAT, GitHubDeletePAT, GitHubGetViewer, GitHubListRepositories, GitHubCloneRepository,
+  RunRepoAutomation, PickFolder,
 } from "../../../../wailsjs/go/main/App";
 import type { telemetry } from "../../../../wailsjs/go/models";
 
-type SubTab = "cicd" | "registry" | "telemetry" | "cli";
+type SubTab = "github" | "cicd" | "registry" | "telemetry" | "cli";
+
+type GHViewer = {
+  login: string;
+  name?: string;
+  html_url?: string;
+};
+
+type GHRepo = {
+  full_name: string;
+  clone_url: string;
+  private: boolean;
+  default_branch?: string;
+};
 
 export function IntegrationsPanel() {
   const setView = useUIStore((s) => s.setView);
@@ -17,6 +32,7 @@ export function IntegrationsPanel() {
   const [msg, setMsg] = useState("");
 
   const tabs: { key: SubTab; label: string }[] = [
+    { key: "github", label: "GitHub & Repo Ingest" },
     { key: "cicd", label: "CI/CD Pipelines" },
     { key: "registry", label: "API Registries" },
     { key: "telemetry", label: "Telemetry" },
@@ -46,11 +62,236 @@ export function IntegrationsPanel() {
         {msg && (
           <div className="mb-3 px-3 py-2 rounded-lg bg-cyan/10 text-cyan text-13 border border-cyan/20">{msg}</div>
         )}
+        {tab === "github" && <GitHubIngestTab onMsg={setMsg} />}
         {tab === "cicd" && <CICDTab onMsg={setMsg} />}
         {tab === "registry" && <RegistryTab onMsg={setMsg} />}
         {tab === "telemetry" && <TelemetryTab onMsg={setMsg} />}
         {tab === "cli" && <CLITab onMsg={setMsg} />}
       </div>
+    </div>
+  );
+}
+
+function GitHubIngestTab({ onMsg }: { onMsg: (m: string) => void }) {
+  const [account, setAccount] = useState("default");
+  const [pat, setPat] = useState("");
+  const [viewer, setViewer] = useState<GHViewer | null>(null);
+  const [repos, setRepos] = useState<GHRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [cloneDest, setCloneDest] = useState("");
+  const [repoPath, setRepoPath] = useState("");
+  const [outputDir, setOutputDir] = useState(".reqit/scan");
+  const [visibility, setVisibility] = useState("all");
+  const [busy, setBusy] = useState(false);
+  const [lastOutput, setLastOutput] = useState("");
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      onMsg(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePat = () => run(async () => {
+    await GitHubSavePAT(account, pat);
+    onMsg("PAT saved to OS keychain.");
+  });
+
+  const deletePat = () => run(async () => {
+    await GitHubDeletePAT(account);
+    setViewer(null);
+    setRepos([]);
+    onMsg("PAT deleted from OS keychain.");
+  });
+
+  const verifyAndLoad = () => run(async () => {
+    const vRaw = await GitHubGetViewer(account);
+    const parsedViewer = JSON.parse(vRaw) as GHViewer;
+    setViewer(parsedViewer);
+
+    const raw = await GitHubListRepositories(account, visibility);
+    const parsed = JSON.parse(raw) as GHRepo[];
+    setRepos(parsed);
+    if (parsed.length > 0) {
+      setSelectedRepo(parsed[0].clone_url);
+    }
+    onMsg(`Connected as ${parsedViewer.login}. Loaded ${parsed.length} repositories.`);
+  });
+
+  const pickCloneDest = () => run(async () => {
+    const dir = await PickFolder("Select clone destination");
+    if (dir) {
+      setCloneDest(dir);
+      onMsg(`Clone destination set: ${dir}`);
+    }
+  });
+
+  const cloneRepo = () => run(async () => {
+    if (!selectedRepo) {
+      onMsg("Select a repository first.");
+      return;
+    }
+    if (!cloneDest) {
+      onMsg("Select clone destination first.");
+      return;
+    }
+    const clonedPath = await GitHubCloneRepository(account, selectedRepo, cloneDest);
+    setRepoPath(clonedPath);
+    onMsg(`Cloned repository to ${clonedPath}`);
+  });
+
+  const pickRepoPath = () => run(async () => {
+    const dir = await PickFolder("Select repository root to ingest");
+    if (dir) {
+      setRepoPath(dir);
+      onMsg(`Repository selected: ${dir}`);
+    }
+  });
+
+  const runCommand = (command: string) => run(async () => {
+    if (!repoPath) {
+      onMsg("Select or clone a repository first.");
+      return;
+    }
+    const result = await RunRepoAutomation(command, repoPath, outputDir);
+    setLastOutput(result);
+    onMsg(result);
+  });
+
+  return (
+    <div className="space-y-5 max-w-5xl">
+      <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+        <h2 className="text-14 font-semibold text-text">1) Connect GitHub Account (PAT)</h2>
+        <p className="text-12 text-subtext">
+          Create a GitHub personal access token and save it in keychain. Required scopes: <strong>repo</strong> (private repos) and
+          <strong> workflow</strong> (if you plan to manage CI workflows).
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div>
+            <label className="text-12 text-subtext block">Account Key</label>
+            <input
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+              placeholder="default"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-12 text-subtext block">Personal Access Token</label>
+            <input
+              value={pat}
+              onChange={(e) => setPat(e.target.value)}
+              type="password"
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+              placeholder="ghp_..."
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={savePat} disabled={busy || !pat.trim()}>Save PAT</Button>
+          <Button onClick={verifyAndLoad} disabled={busy}>Verify & Load Repositories</Button>
+          <Button onClick={deletePat} disabled={busy}>Delete PAT</Button>
+        </div>
+        {viewer && (
+          <div className="text-12 text-subtext">Signed in as <span className="text-cyan">{viewer.login}</span>{viewer.name ? ` (${viewer.name})` : ""}</div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+        <h2 className="text-14 font-semibold text-text">2) Choose Repository</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+          <div>
+            <label className="text-12 text-subtext block">Visibility</label>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+            >
+              <option value="all">all</option>
+              <option value="public">public</option>
+              <option value="private">private</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-12 text-subtext block">Repository</label>
+            <select
+              value={selectedRepo}
+              onChange={(e) => setSelectedRepo(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+            >
+              <option value="">Select repository</option>
+              {repos.map((r) => (
+                <option key={r.clone_url} value={r.clone_url}>
+                  {r.full_name} {r.private ? "(private)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+          <div className="md:col-span-2">
+            <label className="text-12 text-subtext block">Clone destination</label>
+            <input
+              value={cloneDest}
+              onChange={(e) => setCloneDest(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+              placeholder="/Users/you/dev"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={pickCloneDest} disabled={busy}>Browse</Button>
+            <Button onClick={cloneRepo} disabled={busy || !selectedRepo}>Clone</Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+          <div className="md:col-span-2">
+            <label className="text-12 text-subtext block">Repository path (for ingest)</label>
+            <input
+              value={repoPath}
+              onChange={(e) => setRepoPath(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+              placeholder="/path/to/repo"
+            />
+          </div>
+          <div>
+            <Button onClick={pickRepoPath} disabled={busy}>Browse Repo</Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
+        <h2 className="text-14 font-semibold text-text">3) Run Repo Ingest Commands (Desktop)</h2>
+        <div>
+          <label className="text-12 text-subtext block">Output directory (relative or absolute)</label>
+          <input
+            value={outputDir}
+            onChange={(e) => setOutputDir(e.target.value)}
+            className="w-full max-w-xl px-3 py-1.5 rounded-lg bg-bg border border-border text-13 text-text"
+            placeholder=".reqit/scan"
+          />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Button onClick={() => runCommand("scan")} disabled={busy}>Scan</Button>
+          <Button onClick={() => runCommand("generate")} disabled={busy}>Generate</Button>
+          <Button onClick={() => runCommand("workflow-install")} disabled={busy}>Install Workflows</Button>
+          <Button onClick={() => runCommand("sdk-generate")} disabled={busy}>Generate SDK</Button>
+          <Button onClick={() => runCommand("health")} disabled={busy}>Health</Button>
+          <Button onClick={() => runCommand("drift")} disabled={busy}>Drift</Button>
+          <Button onClick={() => runCommand("report")} disabled={busy}>Report</Button>
+          <Button onClick={() => runCommand("full-setup")} disabled={busy}>Full Setup</Button>
+        </div>
+        {lastOutput && (
+          <pre className="text-12 text-subtext bg-bg p-3 rounded-lg whitespace-pre-wrap overflow-x-auto">{lastOutput}</pre>
+        )}
+        <p className="text-12 text-subtext">
+          Full Setup runs: scan, generate, workflow install, sdk generate, health, and report.
+        </p>
+      </section>
     </div>
   );
 }

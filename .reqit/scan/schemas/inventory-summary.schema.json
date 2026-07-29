@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "authSchemes": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "endpointCount": {
+      "type": "integer"
+    }
+  },
+  "title": "ReqitInventorySummary",
+  "type": "object"
+}

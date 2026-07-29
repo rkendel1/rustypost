@@ -1,0 +1,17 @@
+{
+  "tools": [
+    {
+      "description": "Scan repository and discover endpoints",
+      "name": "scan"
+    },
+    {
+      "description": "Detect OpenAPI contract drift",
+      "name": "drift"
+    },
+    {
+      "description": "Compute repository API health score",
+      "name": "health"
+    }
+  ],
+  "version": "1.0"
+}

@@ -50,6 +50,21 @@ type Repository struct {
 	HTMLURL       string `json:"html_url"`
 }
 
+type Viewer struct {
+	Login     string `json:"login"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatar_url"`
+	HTMLURL   string `json:"html_url"`
+}
+
+func (c *Client) GetViewer(ctx context.Context) (*Viewer, error) {
+	var out Viewer
+	if err := c.getJSON(ctx, "/user", &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *Client) ListRepositories(ctx context.Context, visibility string) ([]Repository, error) {
 	q := url.Values{}
 	q.Set("per_page", "100")

@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-07-29T13:37:32Z",
+  "repository": "/Users/randy/Desktop/rustypost",
+  "filesScanned": 349,
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/",
+      "sourceFiles": [
+        "flux/internal/mock/mock.go"
+      ],
+      "lineNumbers": [
+        112
+      ],
+      "responseSchemas": {
+        "200": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/payments",
+      "sourceFiles": [
+        "flux/internal/cli/cli_platform_test.go"
+      ],
+      "lineNumbers": [
+        16
+      ],
+      "authSchemes": [
+        "bearer"
+      ],
+      "requestSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "responseSchemas": {
+        "200": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/status",
+      "sourceFiles": [
+        "flux/internal/cli/cli_platform_test.go",
+        "flux/internal/cli/cli_scan_test.go",
+        "flux/internal/workspace/repository_test.go"
+      ],
+      "lineNumbers": [
+        12,
+        15,
+        24
+      ],
+      "authSchemes": [
+        "bearer"
+      ],
+      "responseSchemas": {
+        "200": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/users",
+      "sourceFiles": [
+        "flux/internal/scanner/scanner_test.go"
+      ],
+      "lineNumbers": [
+        17
+      ],
+      "authSchemes": [
+        "bearer"
+      ],
+      "requestSchema": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "responseSchemas": {
+        "200": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/users/{id}",
+      "sourceFiles": [
+        "flux/internal/scanner/scanner_test.go"
+      ],
+      "lineNumbers": [
+        16
+      ],
+      "authSchemes": [
+        "bearer"
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true
+        }
+      ],
+      "responseSchemas": {
+        "200": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "authSchemes": [
+    "bearer"
+  ]
+}

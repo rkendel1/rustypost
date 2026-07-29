@@ -486,6 +486,26 @@ export function GetWorkspaces() {
   return window['go']['main']['App']['GetWorkspaces']();
 }
 
+export function GitHubCloneRepository(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GitHubCloneRepository'](arg1, arg2, arg3);
+}
+
+export function GitHubDeletePAT(arg1) {
+  return window['go']['main']['App']['GitHubDeletePAT'](arg1);
+}
+
+export function GitHubGetViewer(arg1) {
+  return window['go']['main']['App']['GitHubGetViewer'](arg1);
+}
+
+export function GitHubListRepositories(arg1, arg2) {
+  return window['go']['main']['App']['GitHubListRepositories'](arg1, arg2);
+}
+
+export function GitHubSavePAT(arg1, arg2) {
+  return window['go']['main']['App']['GitHubSavePAT'](arg1, arg2);
+}
+
 export function GitMergeBranch(arg1) {
   return window['go']['main']['App']['GitMergeBranch'](arg1);
 }
@@ -752,6 +772,10 @@ export function RunEvalAgentLens() {
 
 export function RunLoadTest(arg1) {
   return window['go']['main']['App']['RunLoadTest'](arg1);
+}
+
+export function RunRepoAutomation(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RunRepoAutomation'](arg1, arg2, arg3);
 }
 
 export function SaveAISettings(arg1, arg2, arg3, arg4) {

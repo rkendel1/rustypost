@@ -1,0 +1,150 @@
+{
+  "collections": [
+    {
+      "id": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+      "name": "Discovered API",
+      "requests": [
+        {
+          "id": "a2386db5-aa33-41f1-82f1-61867d42a674",
+          "name": "GET /",
+          "collectionId": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+          "payload": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/",
+            "headers": null,
+            "params": null,
+            "bodyType": "none",
+            "body": "",
+            "bodyForm": null,
+            "authType": "",
+            "authValue": "",
+            "specPath": "",
+            "graphqlQuery": "",
+            "graphqlVariables": "",
+            "preScript": "",
+            "postScript": ""
+          },
+          "createdAt": "2026-07-29T13:37:32Z"
+        },
+        {
+          "id": "0d88a0b9-562a-43c1-93a0-2496034e962b",
+          "name": "POST /payments",
+          "collectionId": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+          "payload": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/payments",
+            "headers": null,
+            "params": null,
+            "bodyType": "json",
+            "body": "{}",
+            "bodyForm": null,
+            "authType": "bearer",
+            "authValue": "{{TOKEN}}",
+            "specPath": "",
+            "graphqlQuery": "",
+            "graphqlVariables": "",
+            "preScript": "",
+            "postScript": ""
+          },
+          "createdAt": "2026-07-29T13:37:32Z"
+        },
+        {
+          "id": "5688d5a6-1269-441f-b44a-6f3c86430671",
+          "name": "GET /status",
+          "collectionId": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+          "payload": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/status",
+            "headers": null,
+            "params": null,
+            "bodyType": "none",
+            "body": "",
+            "bodyForm": null,
+            "authType": "bearer",
+            "authValue": "{{TOKEN}}",
+            "specPath": "",
+            "graphqlQuery": "",
+            "graphqlVariables": "",
+            "preScript": "",
+            "postScript": ""
+          },
+          "createdAt": "2026-07-29T13:37:32Z"
+        },
+        {
+          "id": "9fa7f937-4a17-4614-8026-4a07ee4a2472",
+          "name": "POST /users",
+          "collectionId": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+          "payload": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/users",
+            "headers": null,
+            "params": null,
+            "bodyType": "json",
+            "body": "{}",
+            "bodyForm": null,
+            "authType": "bearer",
+            "authValue": "{{TOKEN}}",
+            "specPath": "",
+            "graphqlQuery": "",
+            "graphqlVariables": "",
+            "preScript": "",
+            "postScript": ""
+          },
+          "createdAt": "2026-07-29T13:37:32Z"
+        },
+        {
+          "id": "93598a1b-f814-4dbe-b8e9-fa05b5c9e880",
+          "name": "GET /users/{id}",
+          "collectionId": "e6334b1d-6940-4d0f-a03b-a1b1a798df35",
+          "payload": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/users/{id}",
+            "headers": null,
+            "params": null,
+            "bodyType": "none",
+            "body": "",
+            "bodyForm": null,
+            "authType": "bearer",
+            "authValue": "{{TOKEN}}",
+            "specPath": "",
+            "graphqlQuery": "",
+            "graphqlVariables": "",
+            "preScript": "",
+            "postScript": ""
+          },
+          "createdAt": "2026-07-29T13:37:32Z"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "738c8bbf-f56c-48c5-b28c-759180ff3342",
+      "name": "local",
+      "vars": [
+        {
+          "key": "BASE_URL",
+          "value": "http://localhost:3000",
+          "enabled": true
+        },
+        {
+          "key": "TOKEN",
+          "value": "",
+          "enabled": true
+        },
+        {
+          "key": "API_KEY",
+          "value": "",
+          "enabled": true
+        },
+        {
+          "key": "OAUTH_TOKEN_URL",
+          "value": "",
+          "enabled": true
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2026-07-29T13:37:32Z",
+  "version": "1"
+}
