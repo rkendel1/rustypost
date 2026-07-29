@@ -318,6 +318,29 @@ export namespace agentlens {
 
 }
 
+export namespace capabilities {
+	
+	export class Snapshot {
+	    id: string;
+	    name: string;
+	    description: string;
+	    availability: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Snapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.availability = source["availability"];
+	    }
+	}
+
+}
+
 export namespace cookies {
 	
 	export class CookieInfo {
@@ -455,6 +478,65 @@ export namespace git {
 
 }
 
+export namespace history {
+	
+	export class Entry {
+	    id: string;
+	    kind: string;
+	    name: string;
+	    status: string;
+	    correlationId?: string;
+	    projectId?: string;
+	    sourceId?: string;
+	    jobId?: string;
+	    pipelineId?: string;
+	    // Go type: time
+	    startedAt: any;
+	    // Go type: time
+	    finishedAt: any;
+	    metadata?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.status = source["status"];
+	        this.correlationId = source["correlationId"];
+	        this.projectId = source["projectId"];
+	        this.sourceId = source["sourceId"];
+	        this.jobId = source["jobId"];
+	        this.pipelineId = source["pipelineId"];
+	        this.startedAt = this.convertValues(source["startedAt"], null);
+	        this.finishedAt = this.convertValues(source["finishedAt"], null);
+	        this.metadata = source["metadata"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace interceptor {
 	
 	export class CapturedRequest {
@@ -482,6 +564,77 @@ export namespace interceptor {
 	        this.tabUrl = source["tabUrl"];
 	        this.tabTitle = source["tabTitle"];
 	    }
+	}
+
+}
+
+export namespace jobs {
+	
+	export class Job {
+	    id: string;
+	    type: string;
+	    status: string;
+	    progress: number;
+	    maxRetries?: number;
+	    attempts?: number;
+	    correlationId?: string;
+	    projectId: string;
+	    sourceId?: string;
+	    pipelineId?: string;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    startedAt?: any;
+	    // Go type: time
+	    updatedAt: any;
+	    // Go type: time
+	    finishedAt?: any;
+	    payload?: any;
+	    result?: any;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Job(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.status = source["status"];
+	        this.progress = source["progress"];
+	        this.maxRetries = source["maxRetries"];
+	        this.attempts = source["attempts"];
+	        this.correlationId = source["correlationId"];
+	        this.projectId = source["projectId"];
+	        this.sourceId = source["sourceId"];
+	        this.pipelineId = source["pipelineId"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.startedAt = this.convertValues(source["startedAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.finishedAt = this.convertValues(source["finishedAt"], null);
+	        this.payload = source["payload"];
+	        this.result = source["result"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
@@ -2112,6 +2265,104 @@ export namespace profile {
 
 }
 
+export namespace projects {
+	
+	export class ProjectSource {
+	    id: string;
+	    name: string;
+	    type: string;
+	    path?: string;
+	    url?: string;
+	    branch?: string;
+	    lastSyncedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.path = source["path"];
+	        this.url = source["url"];
+	        this.branch = source["branch"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	    }
+	}
+	export class Project {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    status: string;
+	    sources: ProjectSource[];
+	    createdAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Project(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.status = source["status"];
+	        this.sources = this.convertValues(source["sources"], ProjectSource);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ProjectSummary {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    status: string;
+	    rootDir: string;
+	    sourceCount: number;
+	    createdAt: string;
+	    lastOpenedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.status = source["status"];
+	        this.rootDir = source["rootDir"];
+	        this.sourceCount = source["sourceCount"];
+	        this.createdAt = source["createdAt"];
+	        this.lastOpenedAt = source["lastOpenedAt"];
+	    }
+	}
+
+}
+
 export namespace scheduler {
 	
 	export class ScheduledRun {
@@ -2317,6 +2568,79 @@ export namespace updater {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace vault {
+	
+	export class SecretMetadata {
+	    id: string;
+	    projectId?: string;
+	    name: string;
+	    description?: string;
+	    type: string;
+	    provider: string;
+	    scope: string;
+	    status: string;
+	    createdAt: string;
+	    updatedAt: string;
+	    lastUsedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretMetadata(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.projectId = source["projectId"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.type = source["type"];
+	        this.provider = source["provider"];
+	        this.scope = source["scope"];
+	        this.status = source["status"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.lastUsedAt = source["lastUsedAt"];
+	    }
+	}
+	export class SecretReference {
+	    secretId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretReference(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.secretId = source["secretId"];
+	    }
+	}
+	export class StoreSecretInput {
+	    ProjectID: string;
+	    Name: string;
+	    Description: string;
+	    Type: string;
+	    Scope: string;
+	    Value: string;
+	    Provider: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StoreSecretInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ProjectID = source["ProjectID"];
+	        this.Name = source["Name"];
+	        this.Description = source["Description"];
+	        this.Type = source["Type"];
+	        this.Scope = source["Scope"];
+	        this.Value = source["Value"];
+	        this.Provider = source["Provider"];
+	    }
 	}
 
 }

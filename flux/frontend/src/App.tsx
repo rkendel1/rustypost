@@ -34,6 +34,10 @@ import { AgentLensPanel } from "@/features/agentlens/components/AgentLensPanel";
 import { LoadTestPanel } from "@/features/loadtest/components/LoadTestPanel";
 import { TestSuitePanel } from "@/features/testbuilder/components/TestSuitePanel";
 import { MockPanel } from "@/features/mock/components/MockPanel";
+import { ProjectPicker } from "@/projects/components/ProjectPicker";
+import { ProjectsPanel } from "@/projects/components/ProjectsPanel";
+import { VaultPanel } from "@/vault/components/VaultPanel";
+import { ActivityPanel } from "@/activity/components/ActivityPanel";
 
 import { PasteCurlModal } from "@/shared/components/PasteCurlModal";
 import { TeamModal } from "@/features/git/components/TeamModal";
@@ -47,7 +51,6 @@ import { ToastHost } from "@/shared/components/ToastHost";
 import { UpdateBanner } from "@/shared/components/UpdateBanner";
 import { ReleasePopup } from "@/shared/components/ReleasePopup";
 import { AssistantBot } from "@/shared/components/AssistantBot";
-import { HomeScreen } from "@/app/screens/HomeScreen";
 import { useSendRequest } from "@/features/request/hooks/useSendRequest";
 import { useKeyboardShortcuts } from "@/shared/hooks/useKeyboardShortcuts";
 import { useResizablePanel } from "@/shared/hooks/useResizablePanel";
@@ -61,7 +64,7 @@ import { useResponseStore } from "@/features/request/stores/useResponseStore";
 import { useTabsStore, deriveTitle } from "@/features/tabs/stores/useTabsStore";
 import { useProfileStore } from "@/app/stores/useProfileStore";
 import { useUndoRedo } from "@/shared/lib/useUndoRedo";
-import { useWorkspaceStore } from "@/features/workspace/stores/useWorkspaceStore";
+import { useProjectStore } from "@/projects/stores/useProjectStore";
 import { registerCommands } from "@/shared/lib/commands";
 import { useThemeStore } from "@/shared/lib/useTheme";
 import { GetVersion } from "../wailsjs/go/main/App";
@@ -71,9 +74,9 @@ import "./App.css";
 type Screen = "loading" | "home" | "app";
 
 export default function App() {
-  const loadWorkspaces = useWorkspaceStore((s) => s.load);
-  const activeWorkspaceID = useWorkspaceStore((s) => s.activeID);
-  const wsLoaded = useWorkspaceStore((s) => s.loaded);
+  const loadProjects = useProjectStore((s) => s.load);
+  const activeProjectID = useProjectStore((s) => s.activeID);
+  const projectsLoaded = useProjectStore((s) => s.loaded);
   const loadProfile = useProfileStore((s) => s.load);
   const loadCollections = useCollectionStore((s) => s.load);
   const loadHistory = useHistoryStore((s) => s.load);
@@ -83,18 +86,20 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
 
   useEffect(() => {
-    Promise.all([loadWorkspaces(), loadProfile()]).catch((err) => console.warn("App init error:", err));
-  }, [loadWorkspaces, loadProfile]);
+    Promise.all([loadProjects(), loadProfile()]).catch((err) => console.warn("App init error:", err));
+  }, [loadProjects, loadProfile]);
 
   const resetTabs = useTabsStore((s) => s.resetTabs);
   const clearResponse = useResponseStore((s) => s.clearResponse);
 
   useEffect(() => {
-    if (!wsLoaded) return;
-    if (!activeWorkspaceID) {
+    if (!projectsLoaded) return;
+    if (!activeProjectID) {
       setScreen("home");
     } else {
-      // Existing active workspace on startup — go straight in.
+      // Existing active project on startup (migrated from a workspace, or
+      // last opened) — go straight in. app.go's mountProject already mounted
+      // its collections/history/environments stores on the Go side.
       hydrateTabs();
       void Promise.all([loadCollections(), loadHistory(), loadEnvs()])
         .then(() => setScreen("app"))
@@ -102,7 +107,7 @@ export default function App() {
     }
   // Only run when the initial load resolves, not on every store change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wsLoaded]);
+  }, [projectsLoaded]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -140,7 +145,7 @@ export default function App() {
   if (screen === "home") {
     return (
       <>
-        <HomeScreen onEnter={enterApp} />
+        <ProjectPicker onEnter={enterApp} />
         <ToastHost />
       </>
     );
@@ -400,7 +405,13 @@ function WorkspaceApp({ onGoHome }: { onGoHome: () => void }) {
       </div>
       <Sidebar onGoHome={onGoHome} />
       <div className="flex-1 min-w-0 flex flex-col animate-[fade-in_0.15s_ease-out]" key={view}>
-      {view === "socket" ? (
+      {view === "projects" ? (
+        <ProjectsPanel />
+      ) : view === "vault" ? (
+        <VaultPanel />
+      ) : view === "activity" ? (
+        <ActivityPanel />
+      ) : view === "socket" ? (
         <SocketPanel />
       ) : view === "sse" ? (
         <SSEViewer />

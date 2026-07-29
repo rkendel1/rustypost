@@ -3,17 +3,20 @@ import { useUIStore } from "@/app/stores/useUIStore";
 import { Button } from "@/shared/components/Button";
 import {
   HasEncryptionKey, GenerateEncryptionKey, SetEncryptionPassphrase, DeleteEncryptionKey,
-  ConfigureVault, GetVaultConfig, VaultGetSecret, VaultSetSecret,
   GetSSOProviders, AddSSOProvider, RemoveSSOProvider, ToggleSSOProvider, AuthenticateSSO,
   GetMaskingRules, AddMaskingRule, RemoveMaskingRule, ToggleMaskingRule, MaskText,
   QueryAuditLog, RBACCheck, RBACGrant, RBACRevoke, RBACList,
   GetAirGapConfig, SetAirGapConfig,
 } from "../../../../wailsjs/go/main/App";
 
-type SubTab = "e2ee" | "vault" | "sso" | "masking" | "audit" | "rbac" | "airgap";
+// The old "Secrets Vault" tab (1Password/HashiCorp/AWS CLI bridge, which
+// exposed raw secret values to the frontend via VaultGetSecret) has been
+// removed as part of the Project/Vault architecture rework. Its Go-side
+// bindings no longer exist. A proper Vault UI (metadata-only, no reveal)
+// lands under its own top-level nav section in a later phase.
+type SubTab = "e2ee" | "sso" | "masking" | "audit" | "rbac" | "airgap";
 const tabs: { key: SubTab; label: string }[] = [
   { key: "e2ee", label: "E2EE" },
-  { key: "vault", label: "Secrets Vault" },
   { key: "sso", label: "SSO" },
   { key: "masking", label: "Data Masking" },
   { key: "audit", label: "Audit Trail" },
@@ -46,7 +49,6 @@ export function SecurityPanel() {
       <div className="flex-1 overflow-y-auto p-4">
         {msg && <div className="mb-3 px-3 py-2 rounded-lg bg-cyan/10 text-cyan text-13 border border-cyan/20">{msg}</div>}
         {tab === "e2ee" && <E2EETab onMsg={setMsg} />}
-        {tab === "vault" && <VaultTab onMsg={setMsg} />}
         {tab === "sso" && <SSOTab onMsg={setMsg} />}
         {tab === "masking" && <MaskingTab onMsg={setMsg} />}
         {tab === "audit" && <AuditTab onMsg={setMsg} />}
@@ -104,77 +106,6 @@ function E2EETab({ onMsg }: { onMsg: (m: string) => void }) {
             className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" />
         </div>
         <Button onClick={setKey} disabled={hasKey}>Set Passphrase</Button>
-      </div>
-    </div>
-  );
-}
-
-function VaultTab({ onMsg }: { onMsg: (m: string) => void }) {
-  const [vaultType, setVaultType] = useState("1password");
-  const [token, setToken] = useState("");
-  const [addr, setAddr] = useState("");
-  const [region, setRegion] = useState("");
-  const [path, setPath] = useState("");
-  const [secretVal, setSecretVal] = useState("");
-  const [retrieved, setRetrieved] = useState("");
-
-  const configure = async () => {
-    const cfg = { type: vaultType, token, addr, region };
-    await ConfigureVault(JSON.stringify(cfg));
-    onMsg(`Vault configured: ${vaultType}`);
-  };
-  const getSecret = async () => {
-    try {
-      const val = await VaultGetSecret(path);
-      setRetrieved(val);
-    } catch (e) { onMsg(String(e)); }
-  };
-  const setSecret = async () => {
-    try {
-      await VaultSetSecret(path, secretVal);
-      onMsg("Secret stored.");
-    } catch (e) { onMsg(String(e)); }
-  };
-
-  return (
-    <div className="space-y-4 max-w-lg">
-      <div className="grid grid-cols-2 gap-2">
-        <select value={vaultType} onChange={(e) => setVaultType(e.target.value)}
-          className="px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text">
-          <option value="1password">1Password</option>
-          <option value="hashicorp">HashiCorp Vault</option>
-          <option value="aws">AWS Secrets Manager</option>
-        </select>
-        <Button onClick={configure}>Configure Vault</Button>
-      </div>
-      {vaultType === "hashicorp" && (
-        <div><label className="text-12 text-subtext block">Vault Address</label>
-          <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="https://vault.example.com:8200"
-            className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" /></div>
-      )}
-      {vaultType === "aws" && (
-        <div><label className="text-12 text-subtext block">AWS Region</label>
-          <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-east-1"
-            className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" /></div>
-      )}
-      <div><label className="text-12 text-subtext block">Token / Service Account</label>
-        <input type="password" value={token} onChange={(e) => setToken(e.target.value)}
-          className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" /></div>
-      <div className="border-t border-border pt-4">
-        <h3 className="text-13 font-semibold text-text mb-2">Read / Write Secrets</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <div><label className="text-12 text-subtext block">Secret Path</label>
-            <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="vault/item or path/to/secret"
-              className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" /></div>
-          <div><label className="text-12 text-subtext block">Value to Write</label>
-            <input value={secretVal} onChange={(e) => setSecretVal(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-13 text-text" /></div>
-        </div>
-        <div className="flex gap-2 mt-2">
-          <Button onClick={getSecret}>Read Secret</Button>
-          <Button onClick={setSecret}>Write Secret</Button>
-        </div>
-        {retrieved && <pre className="mt-2 text-12 text-subtext bg-surface p-2 rounded-lg">{retrieved}</pre>}
       </div>
     </div>
   );

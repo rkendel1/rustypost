@@ -25,10 +25,12 @@ const (
 	EventPipelineCompleted EventType = "PipelineCompleted"
 )
 
+// Metadata carries project context through a pipeline run, aligned 1:1 with
+// projects.ProjectContext so the two can convert directly.
 type Metadata struct {
 	CorrelationID string
-	WorkspaceID   string
-	RepositoryID  string
+	ProjectID     string
+	SourceID      string
 	JobID         string
 	PipelineID    string
 }
@@ -71,8 +73,17 @@ func (s *State) Output(key string) (any, bool) {
 	return v, ok
 }
 
+// Redactor masks secret-shaped substrings out of free-text fields before
+// they're published — satisfies the "secrets never in job/pipeline events"
+// invariant without this package needing to know anything about vault or
+// what a secret looks like. internal/masker.Engine implements this.
+type Redactor interface {
+	Mask(string) string
+}
+
 type Engine struct {
-	bus *events.Bus
+	bus      *events.Bus
+	redactor Redactor
 }
 
 func NewEngine(bus *events.Bus) *Engine {
@@ -80,6 +91,12 @@ func NewEngine(bus *events.Bus) *Engine {
 		bus = events.NewBus()
 	}
 	return &Engine{bus: bus}
+}
+
+// SetRedactor installs a Redactor applied to error messages before they're
+// published. Optional — if unset, error text is published as-is.
+func (e *Engine) SetRedactor(r Redactor) {
+	e.redactor = r
 }
 
 func (e *Engine) Run(ctx context.Context, p Pipeline, meta Metadata) (*State, error) {
@@ -163,11 +180,14 @@ func (e *Engine) Run(ctx context.Context, p Pipeline, meta Metadata) (*State, er
 }
 
 func (e *Engine) publish(meta Metadata, typ EventType, pipelineName, stepID, stepName string, progress int, errMsg string) {
+	if e.redactor != nil && errMsg != "" {
+		errMsg = e.redactor.Mask(errMsg)
+	}
 	e.bus.Publish(Topic, events.Event{
 		Name:          string(typ),
 		CorrelationID: meta.CorrelationID,
-		WorkspaceID:   meta.WorkspaceID,
-		RepositoryID:  meta.RepositoryID,
+		ProjectID:     meta.ProjectID,
+		SourceID:      meta.SourceID,
 		JobID:         meta.JobID,
 		PipelineID:    meta.PipelineID,
 		Timestamp:     time.Now().UTC(),

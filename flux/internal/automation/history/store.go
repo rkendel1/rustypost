@@ -14,8 +14,8 @@ type Entry struct {
 	Name          string         `json:"name"`
 	Status        string         `json:"status"`
 	CorrelationID string         `json:"correlationId,omitempty"`
-	WorkspaceID   string         `json:"workspaceId,omitempty"`
-	RepositoryID  string         `json:"repositoryId,omitempty"`
+	ProjectID     string         `json:"projectId,omitempty"`
+	SourceID      string         `json:"sourceId,omitempty"`
 	JobID         string         `json:"jobId,omitempty"`
 	PipelineID    string         `json:"pipelineId,omitempty"`
 	StartedAt     time.Time      `json:"startedAt"`
@@ -23,13 +23,29 @@ type Entry struct {
 	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 
+// Redactor masks secret-shaped substrings out of free-text fields before
+// they're persisted. internal/masker.Engine implements this.
+type Redactor interface {
+	Mask(string) string
+}
+
 type Store struct {
-	path string
-	mu   sync.Mutex
+	path     string
+	mu       sync.Mutex
+	redactor Redactor
 }
 
 func NewStore(workspaceRoot string) *Store {
 	return &Store{path: filepath.Join(workspaceRoot, ".reqit", "automation", "history.json")}
+}
+
+// SetRedactor installs a Redactor applied to Name and any string Metadata
+// values before an entry is appended. Optional — if unset, entries are
+// persisted as given.
+func (s *Store) SetRedactor(r Redactor) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.redactor = r
 }
 
 func (s *Store) Append(entry Entry) error {
@@ -44,6 +60,20 @@ func (s *Store) Append(entry Entry) error {
 	}
 	if entry.StartedAt.IsZero() {
 		entry.StartedAt = entry.FinishedAt
+	}
+	if s.redactor != nil {
+		entry.Name = s.redactor.Mask(entry.Name)
+		if entry.Metadata != nil {
+			redacted := make(map[string]any, len(entry.Metadata))
+			for k, v := range entry.Metadata {
+				if str, ok := v.(string); ok {
+					redacted[k] = s.redactor.Mask(str)
+				} else {
+					redacted[k] = v
+				}
+			}
+			entry.Metadata = redacted
+		}
 	}
 	rows = append(rows, entry)
 	return s.writeLocked(rows)

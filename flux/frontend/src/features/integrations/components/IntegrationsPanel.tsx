@@ -7,7 +7,7 @@ import {
   GenerateJenkins, GenerateGitHubAction, GenerateGitLabCI, GenerateCLIRunnerScript,
   SaveGeneratedTest,
   GitHubSavePAT, GitHubDeletePAT, GitHubGetViewer, GitHubListRepositories, GitHubCloneRepository,
-  RunRepoAutomation, PickFolder,
+  RunRepoAutomation, PickFolder, EnsureProjectForPath,
 } from "../../../../wailsjs/go/main/App";
 import type { telemetry } from "../../../../wailsjs/go/models";
 
@@ -157,7 +157,17 @@ function GitHubIngestTab({ onMsg }: { onMsg: (m: string) => void }) {
       onMsg("Select or clone a repository first.");
       return;
     }
-    const result = await RunRepoAutomation(command, repoPath, outputDir);
+    // Repo Ingest still collects a bare filesystem path (a full Project
+    // picker UI lands in a later phase) — EnsureProjectForPath finds or
+    // creates the Project wrapping it so automation runs through the
+    // Project/Source model rather than a raw path.
+    const project = await EnsureProjectForPath(repoPath, "");
+    const source = project.sources[0];
+    if (!source) {
+      onMsg("Could not resolve a project source for this repository.");
+      return;
+    }
+    const result = await RunRepoAutomation(command, project.id, source.id, outputDir);
     setLastOutput(result);
     onMsg(result);
   });

@@ -9,8 +9,8 @@ import (
 type Event struct {
 	Name          string         `json:"name"`
 	CorrelationID string         `json:"correlationId,omitempty"`
-	WorkspaceID   string         `json:"workspaceId,omitempty"`
-	RepositoryID  string         `json:"repositoryId,omitempty"`
+	ProjectID     string         `json:"projectId,omitempty"`
+	SourceID      string         `json:"sourceId,omitempty"`
 	JobID         string         `json:"jobId,omitempty"`
 	PipelineID    string         `json:"pipelineId,omitempty"`
 	Timestamp     time.Time      `json:"timestamp"`

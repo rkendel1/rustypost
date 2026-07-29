@@ -6,6 +6,10 @@ export function AddMaskingRule(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddMaskingRule'](arg1, arg2, arg3);
 }
 
+export function AddProjectSource(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['AddProjectSource'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function AddRequestToCollection(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddRequestToCollection'](arg1, arg2, arg3);
 }
@@ -32,6 +36,10 @@ export function AnalyzeCollectionAgentLens(arg1) {
 
 export function AppDataDir() {
   return window['go']['main']['App']['AppDataDir']();
+}
+
+export function ArchiveProject(arg1) {
+  return window['go']['main']['App']['ArchiveProject'](arg1);
 }
 
 export function AuthenticateSSO(arg1, arg2) {
@@ -74,10 +82,6 @@ export function ComputeDevStats() {
   return window['go']['main']['App']['ComputeDevStats']();
 }
 
-export function ConfigureVault(arg1) {
-  return window['go']['main']['App']['ConfigureVault'](arg1);
-}
-
 export function ConnectSocket(arg1, arg2) {
   return window['go']['main']['App']['ConnectSocket'](arg1, arg2);
 }
@@ -96,6 +100,10 @@ export function CreateCollection(arg1) {
 
 export function CreateEnvironment(arg1) {
   return window['go']['main']['App']['CreateEnvironment'](arg1);
+}
+
+export function CreateProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
 }
 
 export function CreateSchedule(arg1, arg2, arg3, arg4, arg5) {
@@ -146,6 +154,10 @@ export function DeleteSchedule(arg1) {
   return window['go']['main']['App']['DeleteSchedule'](arg1);
 }
 
+export function DeleteSecret(arg1) {
+  return window['go']['main']['App']['DeleteSecret'](arg1);
+}
+
 export function DeleteTestGroup(arg1, arg2) {
   return window['go']['main']['App']['DeleteTestGroup'](arg1, arg2);
 }
@@ -180,6 +192,10 @@ export function DownloadBinaryResponse(arg1, arg2) {
 
 export function EmitSocketIOEvent(arg1, arg2) {
   return window['go']['main']['App']['EmitSocketIOEvent'](arg1, arg2);
+}
+
+export function EnsureProjectForPath(arg1, arg2) {
+  return window['go']['main']['App']['EnsureProjectForPath'](arg1, arg2);
 }
 
 export function ExportCollectionHTML(arg1, arg2) {
@@ -298,6 +314,10 @@ export function GetActiveContributors() {
   return window['go']['main']['App']['GetActiveContributors']();
 }
 
+export function GetActiveProject() {
+  return window['go']['main']['App']['GetActiveProject']();
+}
+
 export function GetActiveWorkspace() {
   return window['go']['main']['App']['GetActiveWorkspace']();
 }
@@ -402,6 +422,18 @@ export function GetProfile() {
   return window['go']['main']['App']['GetProfile']();
 }
 
+export function GetProjectActivity(arg1) {
+  return window['go']['main']['App']['GetProjectActivity'](arg1);
+}
+
+export function GetProjectCapabilities(arg1) {
+  return window['go']['main']['App']['GetProjectCapabilities'](arg1);
+}
+
+export function GetProjectJobs(arg1) {
+  return window['go']['main']['App']['GetProjectJobs'](arg1);
+}
+
 export function GetProxyConfig() {
   return window['go']['main']['App']['GetProxyConfig']();
 }
@@ -472,10 +504,6 @@ export function GetTierCategories() {
 
 export function GetTiers() {
   return window['go']['main']['App']['GetTiers']();
-}
-
-export function GetVaultConfig() {
-  return window['go']['main']['App']['GetVaultConfig']();
 }
 
 export function GetVersion() {
@@ -598,6 +626,14 @@ export function LinkCollectionSpec(arg1, arg2) {
   return window['go']['main']['App']['LinkCollectionSpec'](arg1, arg2);
 }
 
+export function ListProjects() {
+  return window['go']['main']['App']['ListProjects']();
+}
+
+export function ListSecrets(arg1) {
+  return window['go']['main']['App']['ListSecrets'](arg1);
+}
+
 export function LockCollection(arg1) {
   return window['go']['main']['App']['LockCollection'](arg1);
 }
@@ -644,6 +680,10 @@ export function OAuth2Exchange(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
 
 export function OAuth2Refresh(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['OAuth2Refresh'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function OpenProject(arg1) {
+  return window['go']['main']['App']['OpenProject'](arg1);
 }
 
 export function OpenWorkspaceFromFolder(arg1) {
@@ -726,6 +766,10 @@ export function RemovePlugin(arg1) {
   return window['go']['main']['App']['RemovePlugin'](arg1);
 }
 
+export function RemoveProjectSource(arg1, arg2) {
+  return window['go']['main']['App']['RemoveProjectSource'](arg1, arg2);
+}
+
 export function RemoveSSOProvider(arg1) {
   return window['go']['main']['App']['RemoveSSOProvider'](arg1);
 }
@@ -754,6 +798,10 @@ export function RestartApp() {
   return window['go']['main']['App']['RestartApp']();
 }
 
+export function RotateSecret(arg1, arg2) {
+  return window['go']['main']['App']['RotateSecret'](arg1, arg2);
+}
+
 export function RunCollection(arg1, arg2) {
   return window['go']['main']['App']['RunCollection'](arg1, arg2);
 }
@@ -774,8 +822,12 @@ export function RunLoadTest(arg1) {
   return window['go']['main']['App']['RunLoadTest'](arg1);
 }
 
-export function RunRepoAutomation(arg1, arg2, arg3) {
-  return window['go']['main']['App']['RunRepoAutomation'](arg1, arg2, arg3);
+export function RunProjectScan(arg1, arg2) {
+  return window['go']['main']['App']['RunProjectScan'](arg1, arg2);
+}
+
+export function RunRepoAutomation(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RunRepoAutomation'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveAISettings(arg1, arg2, arg3, arg4) {
@@ -886,6 +938,10 @@ export function StopMockServer() {
   return window['go']['main']['App']['StopMockServer']();
 }
 
+export function StoreSecret(arg1) {
+  return window['go']['main']['App']['StoreSecret'](arg1);
+}
+
 export function SwitchBranch(arg1) {
   return window['go']['main']['App']['SwitchBranch'](arg1);
 }
@@ -926,6 +982,10 @@ export function UpdateProfile(arg1, arg2) {
   return window['go']['main']['App']['UpdateProfile'](arg1, arg2);
 }
 
+export function UpdateProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3);
+}
+
 export function UpdateSavedRequest(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateSavedRequest'](arg1, arg2, arg3);
 }
@@ -948,12 +1008,4 @@ export function UpdateTestSuite(arg1) {
 
 export function UpvoteFeatureRequest(arg1) {
   return window['go']['main']['App']['UpvoteFeatureRequest'](arg1);
-}
-
-export function VaultGetSecret(arg1) {
-  return window['go']['main']['App']['VaultGetSecret'](arg1);
-}
-
-export function VaultSetSecret(arg1, arg2) {
-  return window['go']['main']['App']['VaultSetSecret'](arg1, arg2);
 }

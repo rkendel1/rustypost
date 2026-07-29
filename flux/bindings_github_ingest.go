@@ -13,16 +13,54 @@ import (
 
 	"flux/internal/cli"
 	githubsvc "flux/internal/github"
+	"flux/internal/integrations"
+	"flux/internal/projects"
 )
 
 func (a *App) GitHubSavePAT(account, token string) error {
 	auth := githubsvc.NewAuthService(account)
-	return auth.SaveToken(token)
+	if err := auth.SaveToken(token); err != nil {
+		return err
+	}
+	// Additive, non-blocking: register this PAT as a vault secret +
+	// Integration too, so future capabilities (which resolve credentials
+	// through vault.SecretResolver, never through AuthService directly) see
+	// it immediately rather than waiting for the next app restart.
+	if a.vaultSvc != nil && a.integrations != nil {
+		_ = integrations.MigrateGitHubPAT(context.Background(), account, a.vaultSvc, a.integrations)
+	}
+	return nil
 }
 
 func (a *App) GitHubDeletePAT(account string) error {
 	auth := githubsvc.NewAuthService(account)
-	return auth.DeleteToken()
+	if err := auth.DeleteToken(); err != nil {
+		return err
+	}
+	// Remove the corresponding Integration record, but deliberately leave
+	// the vault secret itself alone — it may be an application-scoped
+	// credential shared elsewhere, and secret deletion is always its own
+	// explicit, confirmed action (see VaultService.DeleteSecret).
+	if a.integrations != nil {
+		account = normalizeAccount(account)
+		name := "GitHub (" + account + ")"
+		if list, err := a.integrations.List(context.Background(), ""); err == nil {
+			for _, in := range list {
+				if in.Provider == integrations.ProviderGitHub && in.Name == name {
+					_ = a.integrations.Remove(context.Background(), in.ID)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func normalizeAccount(account string) string {
+	account = strings.TrimSpace(account)
+	if account == "" {
+		account = "default"
+	}
+	return account
 }
 
 func (a *App) GitHubGetViewer(account string) (string, error) {
@@ -89,12 +127,19 @@ func (a *App) GitHubCloneRepository(account, repository, destinationDir string) 
 	return target, nil
 }
 
-func (a *App) RunRepoAutomation(command, repoPath, outputDir string) (string, error) {
+// RunRepoAutomation runs a scan/generate/health/drift/report/etc. command
+// against a Project Source rather than a bare repository path — the repo
+// path and output directory are both resolved through the Project model
+// (internal/projects), replacing the old hardcoded <repo>/.reqit/scan
+// default with the project's own local-state cache directory. outputDir
+// may still be supplied explicitly (absolute, or relative to the resolved
+// repo path) to override that default.
+func (a *App) RunRepoAutomation(command, projectID, sourceID, outputDir string) (string, error) {
 	cmd := strings.TrimSpace(command)
 	if cmd == "" {
 		return "", fmt.Errorf("command is required")
 	}
-	absRepo, resolvedOutput, err := resolveRepoAndOutput(repoPath, outputDir)
+	absRepo, resolvedOutput, err := a.resolveProjectSourceAndOutput(projectID, sourceID, outputDir)
 	if err != nil {
 		return "", err
 	}
@@ -154,8 +199,29 @@ func (a *App) RunRepoAutomation(command, repoPath, outputDir string) (string, er
 	return fmt.Sprintf("Command '%s' completed. Output: %s", cmd, resolvedOutput), nil
 }
 
-func resolveRepoAndOutput(repoPath, outputDir string) (string, string, error) {
-	absRepo, err := filepath.Abs(strings.TrimSpace(repoPath))
+// resolveProjectSourceAndOutput resolves a Project + Source pair to a
+// concrete repository path, and an output directory that defaults to the
+// project's own .reqit/cache/scan local-state directory rather than a
+// hardcoded path under the repo itself.
+func (a *App) resolveProjectSourceAndOutput(projectID, sourceID, outputDir string) (string, string, error) {
+	if a.projects == nil {
+		return "", "", fmt.Errorf("projects not initialised")
+	}
+	project, err := a.projects.Open(a.ctx, projectID)
+	if err != nil {
+		return "", "", err
+	}
+	var src *projects.ProjectSource
+	for i := range project.Sources {
+		if project.Sources[i].ID == sourceID {
+			src = &project.Sources[i]
+			break
+		}
+	}
+	if src == nil {
+		return "", "", fmt.Errorf("source %q not found on project %q", sourceID, projectID)
+	}
+	absRepo, err := projects.ResolveSourcePath(project.RootDir, *src)
 	if err != nil {
 		return "", "", err
 	}
@@ -167,7 +233,7 @@ func resolveRepoAndOutput(repoPath, outputDir string) (string, string, error) {
 		return "", "", fmt.Errorf("repository path must be a directory")
 	}
 	if strings.TrimSpace(outputDir) == "" {
-		return absRepo, filepath.Join(absRepo, ".reqit", "scan"), nil
+		return absRepo, filepath.Join(projects.CacheDir(project.RootDir), "scan"), nil
 	}
 	if filepath.IsAbs(outputDir) {
 		return absRepo, outputDir, nil

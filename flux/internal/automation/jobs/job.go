@@ -32,7 +32,8 @@ type Job struct {
 	MaxRetries    int       `json:"maxRetries,omitempty"`
 	Attempts      int       `json:"attempts,omitempty"`
 	CorrelationID string    `json:"correlationId,omitempty"`
-	WorkspaceID   string    `json:"workspaceId,omitempty"`
+	ProjectID     string    `json:"projectId"`
+	SourceID      string    `json:"sourceId,omitempty"`
 	PipelineID    string    `json:"pipelineId,omitempty"`
 	CreatedAt     time.Time `json:"createdAt"`
 	StartedAt     time.Time `json:"startedAt,omitempty"`

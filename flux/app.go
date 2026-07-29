@@ -16,6 +16,11 @@ import (
 
 	"flux/internal/audit"
 	aipkg "flux/internal/ai"
+	automationevents "flux/internal/automation/events"
+	automationhistory "flux/internal/automation/history"
+	"flux/internal/automation/jobs"
+	"flux/internal/automation/pipeline"
+	"flux/internal/capabilities"
 	"flux/internal/collections"
 	cookiestore "flux/internal/cookies"
 	"flux/internal/crypto"
@@ -23,6 +28,8 @@ import (
 	gitpkg "flux/internal/git"
 	"flux/internal/growth"
 	"flux/internal/history"
+	"flux/internal/integrations"
+	integrationproviders "flux/internal/integrations/providers"
 	"flux/internal/interceptor"
 	"flux/internal/jwt"
 	"flux/internal/locks"
@@ -34,6 +41,7 @@ import (
 	"flux/internal/openapi"
 	"flux/internal/plugin"
 	"flux/internal/profile"
+	"flux/internal/projects"
 	proxypkg "flux/internal/proxy"
 	"flux/internal/rbac"
 	reqpkg "flux/internal/requester"
@@ -47,6 +55,7 @@ import (
 	traypkg "flux/internal/tray"
 	"flux/internal/updater"
 	"flux/internal/vault"
+	vaultproviders "flux/internal/vault/providers"
 	"flux/internal/watcher"
 	"flux/internal/workspaces"
 
@@ -72,8 +81,6 @@ type App struct {
 	telemetry    *telemetry.Store
 	tray         *traypkg.Tray
 	crypto       *crypto.Store
-	vault        vault.Provider
-	vaultCfg     vault.Config
 	sso          *sso.Store
 	masker       *masker.Engine
 	audit        *audit.Store
@@ -82,6 +89,19 @@ type App struct {
 	ai           *aipkg.Settings
 	devProfile   *profile.DevProfileStore
 	proxyCfg     *proxypkg.Store
+
+	projects      projects.ProjectService
+	vaultSvc      vault.VaultService
+	integrations  integrations.IntegrationService
+	capabilities  *capabilities.Registry
+	activeProject *projects.Project
+
+	jobQueue          *jobs.Queue
+	jobEvents         *jobs.Publisher
+	jobRunner         *jobs.Runner
+	automationBus     *automationevents.Bus
+	pipelineEngine    *pipeline.Engine
+	automationHistory *automationhistory.Store
 
 	mu       sync.Mutex
 	inflight context.CancelFunc
@@ -157,15 +177,91 @@ func (a *App) startup(ctx context.Context) {
 		a.growth = growth.New(dataDir)
 	}
 
+	// Init Project service + Vault. The vault always registers the OS
+	// keychain; the encrypted-file fallback is only added once a user
+	// explicitly consents to it (see EncryptedFileProvider.Unlock), so there
+	// is never a silent plaintext fallback.
+	if dataDir, err := a.AppDataDir(); err == nil {
+		a.projects = projects.NewService(dataDir)
+		keychain := vaultproviders.NewKeychainProvider()
+		a.vaultSvc = vault.NewService(dataDir, keychain)
+		resolver := vault.NewResolver(dataDir, keychain)
+		a.integrations = integrations.NewService(dataDir, resolver,
+			integrationproviders.NewGitHubProvider(),
+			integrationproviders.NewLocalGitProvider(),
+			integrationproviders.NewHTTPGenericProvider(),
+		)
+		// Lazily import a pre-existing GitHub PAT (stored under the legacy
+		// "reqit-github" keychain entry) into the new vault + integration
+		// model. Non-destructive: the legacy entry is left untouched, so
+		// GitHubGetViewer/GitHubListRepositories/GitHubCloneRepository keep
+		// working unchanged regardless of whether this has run.
+		_ = integrations.MigrateGitHubPAT(context.Background(), "default", a.vaultSvc, a.integrations)
+
+		// Register project capabilities. This is the seam a future
+		// BackendVoid compiler capability plugs into — internal/projects
+		// never imports this registry or any capability implementation.
+		a.capabilities = capabilities.NewRegistry()
+		a.capabilities.Register(capabilities.NewAPIIntelligenceCapability())
+		a.capabilities.Register(capabilities.NewGitHubCapability(a.integrations))
+
+		// Init the project-scoped job/pipeline automation runtime. Every Job
+		// enqueued through this Runner carries a required ProjectID (see
+		// internal/automation/jobs.Job) — no automation runs without one.
+		a.jobQueue = jobs.NewQueue(64)
+		a.jobEvents = jobs.NewPublisher()
+		a.jobRunner = jobs.NewRunner(a.jobQueue, a.jobEvents)
+		a.jobRunner.SetRedactor(a.masker)
+		a.jobRunner.Register(jobs.TypeRepositoryScan, a.handleRepositoryScanJob)
+		a.jobRunner.Start(ctx, 2)
+
+		a.automationBus = automationevents.NewBus()
+		a.pipelineEngine = pipeline.NewEngine(a.automationBus)
+		a.pipelineEngine.SetRedactor(a.masker)
+
+		// Forward job lifecycle events to the frontend and persist
+		// terminal ones (completed/failed/cancelled) into the active
+		// project's activity history — masker-redacted at the source
+		// (Runner.SetRedactor above), so no secret value reaches either path.
+		jobEventCh, _ := a.jobEvents.Subscribe(64)
+		go func() {
+			for evt := range jobEventCh {
+				runtime.EventsEmit(a.ctx, "jobs:event", evt)
+				if !isTerminalJobEvent(evt.Type) || a.automationHistory == nil {
+					continue
+				}
+				_ = a.automationHistory.Append(automationhistory.Entry{
+					ID:        evt.Job.ID,
+					Kind:      string(evt.Job.Type),
+					Name:      string(evt.Job.Type),
+					Status:    string(evt.Job.Status),
+					ProjectID: evt.Job.ProjectID,
+					SourceID:  evt.Job.SourceID,
+					JobID:     evt.Job.ID,
+					StartedAt: evt.Job.StartedAt,
+					Metadata:  map[string]any{"attempts": evt.Job.Attempts, "error": evt.Job.Error},
+				})
+			}
+		}()
+	}
+
 	// Wire tray and notify context.
 	a.tray.SetContext(ctx)
 
 	// Migrate legacy flat-file data into a Default workspace if needed.
 	_ = a.workspaces.Migrate()
 
-	// Re-attach scoped stores to the active workspace (if one exists).
-	if dir, err := a.workspaces.ActiveDir(); err == nil && dir != "" {
-		a.mountWorkspace(dir)
+	// Migrate legacy workspaces into Projects — idempotent and
+	// non-destructive, safe to run on every startup (see
+	// projects.MigrateFromWorkspaces). workspaces.Store remains the source
+	// of truth this reads from; nothing here deletes or modifies it.
+	if a.projects != nil {
+		_ = projects.MigrateFromWorkspaces(a.projects, a.workspaces)
+		if id, ok := projects.ActiveProjectID(a.projects); ok {
+			if p, err := a.projects.Open(context.Background(), id); err == nil {
+				a.mountProject(p)
+			}
+		}
 	}
 
 	// Check for updates in the background — emit event if one is found.
@@ -396,6 +492,26 @@ func (a *App) mountWorkspace(dir string) {
 		runtime.EventsEmit(a.ctx, "scheduler:run", results)
 	})
 	a.schedulerExec.Start(a.ctx)
+}
+
+// mountProject resolves a Project's active source directory and mounts it
+// using the exact same store-attachment logic mountWorkspace already
+// provides — Projects is the new entry point, but the body of what gets
+// attached (collections, history, environments, git, scheduler, ...)
+// doesn't need to change to become project-scoped.
+func (a *App) mountProject(p *projects.Project) {
+	mounted, err := projects.Mount(p)
+	if err != nil {
+		return
+	}
+	a.activeProject = p
+	a.mountWorkspace(mounted.ActiveSourcePath)
+
+	// Project-scoped job/pipeline activity history lives under the
+	// project's own local state, like schedulerStor/schedulerExec above.
+	store := automationhistory.NewStore(mounted.RootDir)
+	store.SetRedactor(a.masker)
+	a.automationHistory = store
 }
 
 // ensureWorkspaceGitignore creates a .gitignore in the workspace root that

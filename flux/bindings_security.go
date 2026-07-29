@@ -8,7 +8,6 @@ import (
 	"flux/internal/profile"
 	"flux/internal/rbac"
 	"flux/internal/sso"
-	"flux/internal/vault"
 )
 
 func (a *App) HasEncryptionKey() bool {
@@ -48,52 +47,15 @@ func (a *App) DeleteEncryptionKey() error {
 	return a.crypto.DeleteKey()
 }
 
-// --- Security: Secret Vault ---
-
-func (a *App) ConfigureVault(cfgJSON string) error {
-	if a.airgap != nil && a.airgap.Get().VaultAccessDisabled {
-		return errors.New("vault access disabled by air-gap configuration")
-	}
-	cfg, err := vault.UnmarshalConfig(cfgJSON)
-	if err != nil {
-		return err
-	}
-	p, err := vault.New(cfg)
-	if err != nil {
-		return err
-	}
-	a.vault = p
-	a.vaultCfg = cfg
-	if a.audit != nil {
-		_ = a.audit.Log("system", audit.ActionConfig, "vault", cfg.Type, "", nil)
-	}
-	return nil
-}
-
-func (a *App) GetVaultConfig() string {
-	data, _ := vault.MarshalConfigView(a.vaultCfg)
-	return data
-}
-
-func (a *App) VaultGetSecret(path string) (string, error) {
-	if a.vault == nil {
-		return "", errors.New("no vault configured")
-	}
-	if a.airgap != nil && a.airgap.Get().VaultAccessDisabled {
-		return "", errors.New("vault access disabled by air-gap configuration")
-	}
-	return a.vault.GetSecret(path)
-}
-
-func (a *App) VaultSetSecret(path, value string) error {
-	if a.vault == nil {
-		return errors.New("no vault configured")
-	}
-	if a.airgap != nil && a.airgap.Get().VaultAccessDisabled {
-		return errors.New("vault access disabled by air-gap configuration")
-	}
-	return a.vault.SetSecret(path, value)
-}
+// --- Security: Secrets Vault ---
+//
+// The prior 1Password/HashiCorp/AWS CLI-bridge vault (ConfigureVault,
+// GetVaultConfig, VaultGetSecret, VaultSetSecret) has been removed: it
+// stored raw tokens in plaintext JSON and returned secret values directly to
+// the frontend, which the new Project/Vault architecture forbids. Its
+// replacement (metadata-only ListSecrets/StoreSecret/DeleteSecret, backed by
+// OS-keychain storage, never exposing a raw value to React) is wired in
+// bindings_vault.go once internal/vault's new model lands.
 
 // --- Security: Enterprise SSO ---
 

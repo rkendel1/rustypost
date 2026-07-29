@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight, Book, ChevronDown, ChevronRight, Clock, Download, FileCode2, FileEdit, Folder, GitPullRequest, History as HistoryIcon, Moon, Puzzle, Rocket, Settings, Shield, Sun, Terminal, User, Users, Radio, RefreshCw, Webhook, Code2, Server, ScanEye, Zap, ClipboardCheck, Sparkles } from "lucide-react";
+import { ArrowLeftRight, Book, ChevronDown, ChevronRight, Clock, Download, FileCode2, FileEdit, Folder, GitPullRequest, History as HistoryIcon, Moon, Puzzle, Rocket, Settings, Shield, Sun, Terminal, User, Users, Radio, RefreshCw, Webhook, Code2, Server, ScanEye, Zap, ClipboardCheck, Sparkles, Boxes, Lock, Activity } from "lucide-react";
 import reqitLogo from "../../assets/images/reqitlogo.jpeg";
-import { useWorkspaceStore } from "@/features/workspace/stores/useWorkspaceStore";
+import { useProjectStore } from "@/projects/stores/useProjectStore";
 import { useGitStore } from "@/features/git/stores/useGitStore";
 import { cn } from "@/shared/lib/cn";
 import { CollectionsTree } from "@/features/collections/components/CollectionsTree";
@@ -81,9 +81,7 @@ export function Sidebar({ onGoHome }: { onGoHome: () => void }) {
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const profile = useProfileStore((s) => s.profile);
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const activeID = useWorkspaceStore((s) => s.activeID);
-  const activeWs = workspaces.find((w) => w.id === activeID);
+  const activeProject = useProjectStore((s) => s.activeProject);
 
   const gitStatus = useGitStore((s) => s.status);
   const syncing = useGitStore((s) => s.syncing);
@@ -102,11 +100,11 @@ export function Sidebar({ onGoHome }: { onGoHome: () => void }) {
         type="button"
         onClick={onGoHome}
         className="h-[52px] px-4 flex items-center gap-3 border-b border-border hover:bg-cardHover transition-colors text-left group"
-        title="All workspaces"
+        title="All projects"
       >
         <img src={reqitLogo} alt="reqit" className="h-[30px] w-auto object-contain shrink-0" />
         <span className="flex-1 text-13 font-semibold text-text truncate min-w-0">
-          {activeWs?.name ?? "Workspace"}
+          {activeProject?.name ?? "Project"}
         </span>
         <ChevronDown size={14} className="text-subtext shrink-0 group-hover:text-text transition-colors" />
       </button>
@@ -179,6 +177,24 @@ export function Sidebar({ onGoHome }: { onGoHome: () => void }) {
       {/* ===== FIXED TOOLS (ALWAYS VISIBLE) ===== */}
       <div className="border-t border-border shrink-0 max-h-[40vh] overflow-y-auto">
         <CollapsibleSection label="Tools" defaultOpen={false}>
+          <NavItem
+            icon={<Boxes size={13} />}
+            label="Projects"
+            active={view === "projects"}
+            onClick={() => setView(view === "projects" ? "http" : "projects")}
+          />
+          <NavItem
+            icon={<Lock size={13} />}
+            label="Vault"
+            active={view === "vault"}
+            onClick={() => setView(view === "vault" ? "http" : "vault")}
+          />
+          <NavItem
+            icon={<Activity size={13} />}
+            label="Activity"
+            active={view === "activity"}
+            onClick={() => setView(view === "activity" ? "http" : "activity")}
+          />
           <NavItem
             icon={<Radio size={13} />}
             label="WebSocket"

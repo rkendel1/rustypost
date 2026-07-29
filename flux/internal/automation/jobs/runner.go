@@ -10,6 +10,13 @@ import (
 
 type Handler func(ctx context.Context, job Job, progress func(int)) (any, error)
 
+// Redactor masks secret-shaped substrings out of free-text fields before
+// they're published or retained in history. internal/masker.Engine
+// implements this.
+type Redactor interface {
+	Mask(string) string
+}
+
 type Runner struct {
 	queue    *Queue
 	events   *Publisher
@@ -17,6 +24,7 @@ type Runner struct {
 	handlers map[Type]Handler
 	cancels  map[string]context.CancelFunc
 	history  []Job
+	redactor Redactor
 }
 
 func NewRunner(queue *Queue, events *Publisher) *Runner {
@@ -32,6 +40,25 @@ func (r *Runner) Register(jobType Type, h Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handlers[jobType] = h
+}
+
+// SetRedactor installs a Redactor applied to Job.Error before a job event is
+// published or the job is retained in history. Optional — if unset, error
+// text passes through as-is.
+func (r *Runner) SetRedactor(red Redactor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.redactor = red
+}
+
+func (r *Runner) redact(job Job) Job {
+	r.mu.RLock()
+	red := r.redactor
+	r.mu.RUnlock()
+	if red != nil && job.Error != "" {
+		job.Error = red.Mask(job.Error)
+	}
+	return job
 }
 
 func (r *Runner) Start(ctx context.Context, workers ...int) {
@@ -91,6 +118,7 @@ func (r *Runner) runOne(ctx context.Context, job Job) {
 		job.Status = StatusFailed
 		job.Error = fmt.Sprintf("no handler registered for %s", job.Type)
 		job.FinishedAt = time.Now().UTC()
+		job = r.redact(job)
 		r.queue.Update(job)
 		r.events.Publish(Event{Type: EventFailed, Job: job})
 		r.appendHistory(job)
@@ -140,6 +168,7 @@ func (r *Runner) runOne(ctx context.Context, job Job) {
 			job.Status = StatusCancelled
 			job.Error = context.Canceled.Error()
 			job.FinishedAt = time.Now().UTC()
+			job = r.redact(job)
 			r.queue.Update(job)
 			r.events.Publish(Event{Type: EventCancelled, Job: job})
 			r.appendHistory(job)
@@ -149,6 +178,7 @@ func (r *Runner) runOne(ctx context.Context, job Job) {
 			job.Status = StatusFailed
 			job.Error = err.Error()
 			job.FinishedAt = time.Now().UTC()
+			job = r.redact(job)
 			r.queue.Update(job)
 			r.events.Publish(Event{Type: EventFailed, Job: job})
 			r.appendHistory(job)
