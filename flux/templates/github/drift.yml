@@ -1,0 +1,14 @@
+name: Reqit Drift Detection
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  reqit-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check API drift
+        run: node tests/scan.runner.js --drift

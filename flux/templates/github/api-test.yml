@@ -1,0 +1,14 @@
+name: Reqit API Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  reqit-api-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run reqit generated tests
+        run: node tests/scan.runner.js

@@ -1,0 +1,14 @@
+name: Reqit Release Verification
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  reqit-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify generated automation artifacts
+        run: node tests/scan.runner.js --release
