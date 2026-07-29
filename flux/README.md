@@ -63,8 +63,14 @@ Output: `build/bin/reqit` (or `reqit.exe` on Windows).
 **Storage**: Each workspace is a subdirectory in the OS app data dir (`%APPDATA%/reqit/` on Windows). Data is stored as JSON files — collections, environments, history, cookies. Git-native synchronization is layered on top.
 
 **Repository Automation Boundary**:
+- `internal/app/lifecycle/`: desktop-hosted service lifecycle manager for startup/shutdown orchestration
+- `internal/services/`: shared backend service contracts used by desktop and CLI capabilities
 - `internal/workspace/`: Reqit workspace metadata (`.reqit-workspace/`) and target artifact layout separation (`.reqit/`, `openapi/`, `tests/`, `.github/workflows/`)
-- `internal/automation/jobs/`: central long-running job queue/runner/events for scan/generate/install/pr flows
+- `internal/automation/events/`: internal event bus for decoupled runtime communication
+- `internal/automation/pipeline/`: orchestration engine for multi-step automation flows with dependencies/retries/rollback
+- `internal/automation/scheduler/`: dependency-aware background scheduler for queued automation jobs
+- `internal/automation/jobs/`: long-running job runtime with progress, cancellation, retries, and execution history
+- `internal/automation/history/`: persisted automation execution history scoped under workspace artifacts
 - `internal/github/`: GitHub auth, repository, pull request, and Actions integration layer
 - `templates/github/`: source-owned CI templates copied into target repositories on install
 

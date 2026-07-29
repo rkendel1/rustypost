@@ -7,7 +7,10 @@ type EventType string
 const (
 	EventQueued    EventType = "queued"
 	EventRunning   EventType = "running"
+	EventPaused    EventType = "paused"
+	EventRetried   EventType = "retried"
 	EventProgress  EventType = "progress"
+	EventCancelled EventType = "cancelled"
 	EventCompleted EventType = "completed"
 	EventFailed    EventType = "failed"
 )
