@@ -15,6 +15,7 @@ type testStep struct {
 	runFn      func() error
 	rollbackFn func()
 	retryOnErr bool
+	maxRetries int
 	runs       int
 	rollbacks  int
 }
@@ -40,7 +41,7 @@ func (s *testStep) Rollback(ctx context.Context, state *State) error {
 	return nil
 }
 func (s *testStep) CanRetry(err error, attempt int) bool {
-	return s.retryOnErr && attempt < 2
+	return s.retryOnErr && attempt < s.maxRetries
 }
 
 func TestEngineRunsPipelineWithDependencies(t *testing.T) {
@@ -78,6 +79,7 @@ func TestEngineRetriesAndRollsBack(t *testing.T) {
 		name:       "Fail",
 		progress:   75,
 		retryOnErr: true,
+		maxRetries: 2,
 		runFn:      func() error { return errors.New("boom") },
 	}
 

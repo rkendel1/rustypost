@@ -63,7 +63,7 @@ func (b *Bus) Publish(topic string, evt Event) {
 
 	b.mu.RLock()
 	subs := b.topics[topic]
-	slow := make([]subscriber, 0)
+	slow := make([]subscriber, 0, len(subs))
 	for ch := range subs {
 		select {
 		case ch <- evt:
