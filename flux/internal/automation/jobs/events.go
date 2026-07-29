@@ -41,11 +41,24 @@ func (p *Publisher) Subscribe(buffer int) (<-chan Event, func()) {
 
 func (p *Publisher) Publish(evt Event) {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	slow := make([]chan Event, 0)
 	for ch := range p.subscribers {
 		select {
 		case ch <- evt:
 		default:
+			slow = append(slow, ch)
 		}
 	}
+	p.mu.RUnlock()
+	if len(slow) == 0 {
+		return
+	}
+	p.mu.Lock()
+	for _, ch := range slow {
+		if _, ok := p.subscribers[ch]; ok {
+			delete(p.subscribers, ch)
+			close(ch)
+		}
+	}
+	p.mu.Unlock()
 }
