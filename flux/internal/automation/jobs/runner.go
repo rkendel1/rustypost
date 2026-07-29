@@ -126,10 +126,10 @@ func (r *Runner) runOne(ctx context.Context, job Job) {
 
 	var result any
 	var err error
-	maxAttempts := job.MaxRetries + 1
-	if maxAttempts < 1 {
-		maxAttempts = 1
+	if job.MaxRetries < 0 {
+		job.MaxRetries = 0
 	}
+	maxAttempts := job.MaxRetries + 1
 	for {
 		job.Attempts++
 		result, err = handler(runCtx, job, progress)

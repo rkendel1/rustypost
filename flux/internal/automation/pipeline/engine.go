@@ -107,7 +107,7 @@ func (e *Engine) Run(ctx context.Context, p Pipeline, meta Metadata) (*State, er
 		return nil, err
 	}
 
-	state := &State{Inputs: cloneMap(p.Inputs), Outputs: map[string]any{}}
+	state := &State{Inputs: cloneMap(p.Inputs)}
 	e.publish(meta, EventPipelineStarted, p.Name, "", "", 0, "")
 
 	completed := make([]Step, 0, len(p.Steps))
