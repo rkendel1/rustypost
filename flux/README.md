@@ -62,6 +62,12 @@ Output: `build/bin/reqit` (or `reqit.exe` on Windows).
 
 **Storage**: Each workspace is a subdirectory in the OS app data dir (`%APPDATA%/reqit/` on Windows). Data is stored as JSON files — collections, environments, history, cookies. Git-native synchronization is layered on top.
 
+**Repository Automation Boundary**:
+- `internal/workspace/`: Reqit workspace metadata (`.reqit-workspace/`) and target artifact layout separation (`.reqit/`, `openapi/`, `tests/`, `.github/workflows/`)
+- `internal/automation/jobs/`: central long-running job queue/runner/events for scan/generate/install/pr flows
+- `internal/github/`: GitHub auth, repository, pull request, and Actions integration layer
+- `templates/github/`: source-owned CI templates copied into target repositories on install
+
 ---
 
 ## Directory Tree with File Purposes
@@ -199,6 +205,16 @@ Generates Playwright/Jest tests, CLI runners, and CI pipeline configs.
 | File | Purpose |
 |---|---|
 | `external.go` | Generates Playwright tests, Jest tests, CLI runner scripts, GitHub Actions, GitLab CI, Jenkins configs |
+
+#### github/ — GitHub Integration Service Layer
+Authentication and repository/PR/actions APIs used by desktop and automation services.
+
+| File | Purpose |
+|---|---|
+| `auth.go` | Secure token storage/retrieval via OS keyring |
+| `repositories.go` | GitHub repository browsing/list/get API client |
+| `pull_requests.go` | Pull request creation API client |
+| `actions.go` | GitHub Actions workflow run listing API client |
 
 #### git/ — Native Git Integration
 Full Git workspace using go-git.
@@ -451,6 +467,25 @@ JSON-RPC 2.0 MCP server over stdio for AI agent integration.
 | File | Purpose |
 |---|---|
 | `workspaces.go` | CRUD for named workspace directories with active selection |
+
+#### workspace/ — Repository Workspace Metadata
+Repository-specific workspace metadata/state cache and artifact boundary helpers.
+
+| File | Purpose |
+|---|---|
+| `manager.go` | `.reqit-workspace/` metadata (`workspace.json`, `scan-history.json`, `settings.json`, cache) |
+| `repository.go` | Repository service (`Clone`, `Open`, `Scan`, branch switch, change detection) |
+| `artifacts.go` | Target repository artifact layout for `.reqit/`, `openapi/`, `tests/`, workflows |
+
+#### automation/jobs/ — Observable Job System
+Queue/runner/events model for long-running desktop automation operations.
+
+| File | Purpose |
+|---|---|
+| `job.go` | Job type/status model |
+| `queue.go` | In-memory job queue/state tracking |
+| `runner.go` | Handler-driven job execution with progress callbacks |
+| `events.go` | Event publisher/subscriber for desktop job updates |
 
 ---
 
@@ -726,6 +761,14 @@ The workflow (`.github/workflows/release.yml`):
 | Linux | `~/.config/reqit/` |
 
 Each workspace is a subdirectory containing JSON files for collections, environments, history, cookies, and git metadata.
+
+Repository metadata is stored separately in `.reqit-workspace/` (`workspace.json`, `scan-history.json`, `settings.json`, and `cache/*`) to keep Reqit state isolated from generated target artifacts.
+
+Generated repository artifacts are isolated under:
+- `.reqit/` (collections, environments, reports)
+- `openapi/`
+- `tests/`
+- `.github/workflows/`
 
 ---
 
