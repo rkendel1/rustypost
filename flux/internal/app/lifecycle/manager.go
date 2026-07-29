@@ -43,7 +43,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	if m.isRunning {
 		return nil
 	}
-	m.started = m.started[:0]
+	m.started = nil
 	for _, svc := range m.services {
 		if err := svc.Initialize(ctx); err != nil {
 			for i := len(m.started) - 1; i >= 0; i-- {
