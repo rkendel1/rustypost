@@ -61,7 +61,8 @@ func TestManagerMetadataRoundTrip(t *testing.T) {
 	if err := m.ReadCache("routes.json", &cacheOut); err != nil {
 		t.Fatalf("read cache: %v", err)
 	}
-	if cacheOut["routes"].(float64) != 10 {
+	routes, ok := cacheOut["routes"].(float64)
+	if !ok || routes != 10 {
 		t.Fatalf("unexpected cache data: %#v", cacheOut)
 	}
 }

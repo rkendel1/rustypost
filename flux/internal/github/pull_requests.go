@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 )
 
 type PullRequest struct {
@@ -45,7 +47,8 @@ func (c *Client) CreatePullRequest(ctx context.Context, owner, repo string, inpu
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("github api create pull request: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("github api create pull request: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	var out PullRequest
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
