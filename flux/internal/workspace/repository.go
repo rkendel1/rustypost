@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/google/uuid"
 
 	gitpkg "flux/internal/git"
 	"flux/internal/scanner"
@@ -107,7 +107,7 @@ func deriveRepoDirName(url string) string {
 	}
 	name = strings.TrimSpace(name)
 	if name == "" || name == "." {
-		return fmt.Sprintf("repository-%d", time.Now().UTC().UnixNano())
+		return fmt.Sprintf("repository-%s", uuid.NewString())
 	}
 	return name
 }

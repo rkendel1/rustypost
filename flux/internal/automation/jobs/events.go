@@ -26,6 +26,9 @@ func NewPublisher() *Publisher {
 	return &Publisher{subscribers: map[chan Event]struct{}{}}
 }
 
+// Subscribe registers a listener and returns an unsubscribe callback.
+// Consumers should stop reading when the channel closes; a channel may be
+// closed automatically if the consumer falls behind and its buffer stays full.
 func (p *Publisher) Subscribe(buffer int) (<-chan Event, func()) {
 	ch := make(chan Event, buffer)
 	p.mu.Lock()
