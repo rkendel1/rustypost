@@ -37,8 +37,9 @@ func (e *Engine) Start(ctx context.Context, workers int) {
 	if e.events == nil {
 		return
 	}
-	ch, _ := e.events.Subscribe(64)
+	ch, unsubscribe := e.events.Subscribe(64)
 	go func() {
+		defer unsubscribe()
 		for {
 			select {
 			case <-ctx.Done():

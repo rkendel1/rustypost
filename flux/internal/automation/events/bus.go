@@ -63,22 +63,22 @@ func (b *Bus) Publish(topic string, evt Event) {
 
 	b.mu.RLock()
 	subs := b.topics[topic]
-	blockedSubscribers := make([]subscriber, 0, len(subs))
+	fullBufferSubscribers := make([]subscriber, 0, len(subs))
 	for ch := range subs {
 		select {
 		case ch <- evt:
 		default:
-			blockedSubscribers = append(blockedSubscribers, ch)
+			fullBufferSubscribers = append(fullBufferSubscribers, ch)
 		}
 	}
 	b.mu.RUnlock()
-	if len(blockedSubscribers) == 0 {
+	if len(fullBufferSubscribers) == 0 {
 		return
 	}
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for _, ch := range blockedSubscribers {
+	for _, ch := range fullBufferSubscribers {
 		if subs, ok := b.topics[topic]; ok {
 			if _, exists := subs[ch]; exists {
 				delete(subs, ch)
